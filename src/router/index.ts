@@ -2,7 +2,8 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 
 const routes: Array<RouteRecordRaw> = [
 	{
-		path: '/',
+		path: '/simple',
+		alias: '/',
 		name: 'simple',
 		component: () => import(/* webpackChunkName: "simple" */ '../simple/SimpleGame.vue')
 	},
