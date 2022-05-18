@@ -3,6 +3,8 @@ import World from './world';
 
 export default class Entity extends EventEmitter {
 	world: World;
+
+	id: number;
 	x = 0;
 	y = 0;
 	width = 0;
@@ -23,6 +25,7 @@ export default class Entity extends EventEmitter {
 		super();
 
 		this.world = world;
+		this.id = world.getId();
 	}
 
 	load(config: any) {

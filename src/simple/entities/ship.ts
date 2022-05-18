@@ -69,7 +69,7 @@ export default class Ship extends Entity {
 	}
 
 	getNearestEnemy(): Entity | null {
-		let enemies = this.world.entities.filter(entity => {
+		return this.world.getNearestEntity(this, entity => {
 			if(entity instanceof Station) {
 				return entity !== this.station;
 			} else if(entity instanceof Ship) {
@@ -78,11 +78,6 @@ export default class Ship extends Entity {
 				return false;
 			}
 		});
-
-		enemies.sort((a, b) => {
-			return distance(a.x, a.y, this.x, this.y) - distance(b.x, b.y, this.x, this.y);
-		});
-		return enemies[0];
 	}
 	getMoveTowardsForce(entity: Entity) {
 		let force = new PhaserMath.Vector2(entity.x - this.x, entity.y - this.y);
