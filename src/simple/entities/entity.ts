@@ -56,11 +56,19 @@ export default class Entity extends EventEmitter {
 	}
 
 	die() {
+		// Only emit dead once
+		if(this.dead) {
+			return;
+		}
+
 		this.dead = true;
 		this.emit('dead');
 	}
+	canTakeDamage() {
+		return this.timeSinceTakenDamage >= 0.2;
+	}
 	takeDamage(damage: number) {
-		if(this.timeSinceTakenDamage < 0.2) {
+		if(!this.canTakeDamage()) {
 			return;
 		}
 

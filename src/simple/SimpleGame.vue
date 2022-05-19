@@ -1,19 +1,23 @@
 <template>
 	<div class="home">
-		<ul>
-			<li>Startup time: {{ startupTime }} ms</li>
-			<li>Update time: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }}) ms</li>
-		</ul>
+		<div class="list">
+			<div>Startup time: {{ startupTime }} ms</div>
+			<div>Update time: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
+			<p/>
+
+			<div>Entities: {{ stationsCount }} stations and {{ shipsCount }} ships</div>
+			<div v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</div>
+		</div>
 
 		<div id="phaser-container-simple"/>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
-import World from '@/simple/entities/world';
-import Entity from '@/simple/entities/entity';
+import World from './entities/world';
+import Entity from './entities/entity';
 import generateScene from '@/data/generate-scene';
 import Station from './entities/station';
 import Ship from './entities/ship';
@@ -23,6 +27,9 @@ const startupTime = ref(0);
 const minUpdateTime = ref(0);
 const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
+const stationsCount = ref(0);
+const shipsCount = ref(0);
+const stationShips = ref([]) as Ref<Array<{ color: number, displayColor: string, ships: number }>>;
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -31,6 +38,7 @@ onMounted(() => {
 
 	const width = window.innerWidth / 3 * 2;
 	const height = window.innerHeight / 3 * 2;
+	let paused = false;
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
 		width,
@@ -78,8 +86,30 @@ onMounted(() => {
 				}));
 				let end = performance.now();
 				startupTime.value = end - start;
+
+				let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
+				stationShips.value = stations.map(station => {
+					let displayColor = '#' + station.color.toString(16);
+					if(displayColor === '#ffffff') {
+						displayColor = '#00000';
+					}
+
+					return {
+						color: station.color,
+						displayColor,
+						ships: station.ships.length
+					};
+				});
+
+				this.input.keyboard.on('keydown-SPACE', () => {
+					paused = !paused;
+				});
 			},
 			update(time: number, delta: number) {
+				if(paused) {
+					return;
+				}
+
 				let start = performance.now();
 				world.update(delta / 1_000);
 				let end = performance.now();
@@ -98,6 +128,20 @@ onMounted(() => {
 					}, 0) / updateTimes.length;
 					updateTimes = [];
 					updateTicks = 0;
+
+					stationsCount.value = world.entities.filter(entity => entity instanceof Station).length;
+					shipsCount.value = world.entities.filter(entity => entity instanceof Ship).length;
+
+					let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
+					stationShips.value.forEach(val => {
+						let matchingStation = stations.find(station => station.color === val.color);
+						if(matchingStation) {
+							val.ships = matchingStation.ships.length;
+						} else if(val.ships > 0) {
+							paused = true;
+							val.ships = 0;
+						}
+					});
 				}
 			}
 		}
@@ -110,3 +154,9 @@ onBeforeUnmount(() => {
 	} 
 });
 </script>
+
+<style scoped>
+.list {
+	margin-bottom: 1em;
+}
+</style>

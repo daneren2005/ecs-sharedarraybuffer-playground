@@ -20,7 +20,7 @@ export default class Station extends Entity {
 	update(delta: number) {
 		super.update(delta);
 
-		if(this.money) {
+		if(this.money > 0) {
 			let ship = new Ship(this);
 			ship.x = this.x;
 			ship.y = this.y;
