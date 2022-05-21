@@ -77,7 +77,7 @@ onMounted(() => {
 				let start = performance.now();
 				world.load(generateScene({
 					stations: 6,
-					shipsPerStation: 200,
+					shipsPerStation: 100,
 					width,
 					height
 				}));
