@@ -1,6 +1,8 @@
+import computeAngle from '@/math/compute-angle';
+import distance from '@/math/distance';
+import euclideanDistance from '@/math/euclidean-distance';
 import Entity from './entity';
 import Station from './station';
-const Geom = require('phaser/src/geom');
 const PhaserMath = require('phaser/src/math');
 
 export default class Ship extends Entity {
@@ -38,7 +40,7 @@ export default class Ship extends Entity {
 				this.set('velocityX', newVelocity.x * this.speed);
 				this.set('velocityY', newVelocity.y * this.speed);
 
-				this.set('angle', computeAngle(new PhaserMath.Vector2(this.velocityX, this.velocityY)));
+				this.set('angle', computeAngle(this.velocityX, this.velocityY));
 			}
 		}
 
@@ -116,17 +118,4 @@ export default class Ship extends Entity {
 			}
 		}
 	}
-}
-
-function distance(x1: number, y1: number, x2: number, y2: number): number {
-	return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-}
-function euclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
-	return (x1 - x2) ** 2 + (y1 - y2) ** 2;
-}
-
-function computeAngle(velocity: number) {
-	let zeroPoint = new Geom.Point(0, 0);
-	let angleRad = PhaserMath.Angle.BetweenPoints(zeroPoint, velocity);
-	return PhaserMath.RadToDeg(angleRad);
 }

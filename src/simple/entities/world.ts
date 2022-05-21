@@ -2,6 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import Entity from './entity';
 import Station from './station';
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import euclideanDistance from '@/math/euclidean-distance';
 
 export default class World extends EventEmitter {
 	entities: Array<Entity> = [];
@@ -103,8 +104,4 @@ export default class World extends EventEmitter {
 		this.idCounter++;
 		return this.idCounter;
 	}
-}
-
-function euclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
-	return (x1 - x2) ** 2 + (y1 - y2) ** 2;
 }

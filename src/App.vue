@@ -1,7 +1,7 @@
 <template>
   <nav>
-    <router-link to="/">Simple Entity</router-link> |
-    <router-link to="/about">BitECS</router-link>
+	<router-link to="/bitecs">BitECS</router-link> |
+    <router-link to="/simple">Simple Entity</router-link>
   </nav>
   <router-view/>
 </template>

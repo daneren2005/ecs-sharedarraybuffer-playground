@@ -12,18 +12,20 @@
 			<button @click="addShips">Add Ships</button>
 		</div>
 
-		<div id="phaser-container-simple"/>
+		<div id="phaser-container-bitecs"/>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
+import generateScene from '@/data/generate-scene';
 import World from './entities/world';
 import Entity from './entities/entity';
-import generateScene from '@/data/generate-scene';
 import Station from './entities/station';
 import Ship from './entities/ship';
+import { Changed, defineQuery } from 'bitecs';
+import components from './components';
 
 let world = new World();
 const startupTime = ref(0);
@@ -32,7 +34,8 @@ const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
 const stationsCount = ref(0);
 const shipsCount = ref(0);
-const stationShips = ref([]) as Ref<Array<{ color: number, displayColor: string, ships: number }>>;
+const stationShips = ref([]) as Ref<Array<{ eid: number, color: number, displayColor: string, ships: number }>>;
+const stationQuery = defineQuery([components.controller]);
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -42,11 +45,15 @@ onMounted(() => {
 	const width = window.innerWidth / 3 * 2;
 	const height = window.innerHeight / 3 * 2;
 	let paused = false;
+	const changedPositionQuery = defineQuery([ Changed(components.position) ]);
+	const changedHealthQuery = defineQuery([ Changed(components.health) ]);
+	const controlledQuery = defineQuery([components.controlled]);
+	const eidSpriteMap = new Map<number, any>();
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
 		width,
 		height,
-		parent: 'phaser-container-simple',
+		parent: 'phaser-container-bitecs',
 		// @ts-expect-error
 		scene: {
 			preload() {
@@ -64,20 +71,7 @@ onMounted(() => {
 					if(entity instanceof Station || entity instanceof Ship) {
 						image.setTint(entity.color);
 					}
-
-					['x', 'y', 'angle'].forEach(prop => {
-						entity.on(`${prop}-updated`, (newValue: any) => {
-							image[prop] = newValue;
-							image.shieldImage[prop] = newValue;
-						});
-					});
-					entity.on('dead', () => {
-						image.destroy();
-						image.shieldImage.destroy();
-					});
-					entity.on('shields-updated', (newValue: number) => {
-						image.shieldImage.visible = newValue > 0;
-					});
+					eidSpriteMap.set(entity.eid, image);
 				});
 
 				let start = performance.now();
@@ -98,9 +92,10 @@ onMounted(() => {
 					}
 
 					return {
+						eid: station.eid,
 						color: station.color,
 						displayColor,
-						ships: station.ships.length
+						ships: 0
 					};
 				});
 
@@ -115,6 +110,30 @@ onMounted(() => {
 
 				let start = performance.now();
 				world.update(delta / 1_000);
+
+				changedPositionQuery(world.ecs).forEach(eid => {
+					let image = eidSpriteMap.get(eid);
+					if(!image) {
+						return;
+					}
+
+					image.x = image.shieldImage.x = components.position.x[eid];
+					image.y = image.shieldImage.y = components.position.y[eid];
+					image.angle = image.shieldImage.angle = components.position.angle[eid];
+				});
+				changedHealthQuery(world.ecs).forEach(eid => {
+					let image = eidSpriteMap.get(eid);
+					if(!image) {
+						return;
+					}
+
+					image.shieldImage.visible = components.health.shields[eid] > 0;
+					if(components.health.dead[eid]) {
+						image.destroy();
+						image.shieldImage.destroy();
+						eidSpriteMap.delete(eid);
+					}
+				});
 				let end = performance.now();
 
 				updateTimes.push(end - start);
@@ -133,13 +152,14 @@ onMounted(() => {
 					updateTicks = 0;
 
 					stationsCount.value = world.entities.filter(entity => entity instanceof Station).length;
-					shipsCount.value = world.entities.filter(entity => entity instanceof Ship).length;
 
-					let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
+					let stations = stationQuery(world.ecs).filter(eid => !components.health.dead[eid]);
+					let ships = controlledQuery(world.ecs).filter(eid => !components.health.dead[eid]);
+					shipsCount.value = ships.length;
 					stationShips.value.forEach(val => {
-						let matchingStation = stations.find(station => station.color === val.color);
-						if(matchingStation) {
-							val.ships = matchingStation.ships.length;
+						let matchingStationEid = stations.find(eid => components.controller.color[eid] === val.color);
+						if(matchingStationEid) {
+							val.ships = ships.filter(eid => components.controlled.owner[eid] === val.eid).length;
 						} else if(val.ships > 0) {
 							// paused = true;
 							val.ships = 0;
@@ -158,9 +178,8 @@ onBeforeUnmount(() => {
 });
 
 function addShips() {
-	let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
-	stations.forEach(station => {
-		station.set('money', station.money + 10);
+	stationQuery(world.ecs).forEach(eid => {
+		world.components.controller.money[eid] += 10;
 	});
 }
 </script>
