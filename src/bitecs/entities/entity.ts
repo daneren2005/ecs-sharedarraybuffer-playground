@@ -1,6 +1,5 @@
 import { addComponent, addEntity, Component } from 'bitecs';
 import { EventEmitter } from 'eventemitter3';
-import Position from '../components/position';
 import World from './world';
 
 export default class Entity extends EventEmitter {

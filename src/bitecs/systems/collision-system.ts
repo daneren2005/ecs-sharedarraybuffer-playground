@@ -15,21 +15,23 @@ export default function collisionSystem(world: World) {
 	// 60fps = 0.016 so 30fps is roughly 0.032 so basically every other frame
 	const TIME_BETWEEN_TICKS = 0.03;
 	let timeSinceLastTick = TIME_BETWEEN_TICKS + 1;
+	let ships: Array<number> = [];
+	let minCountToUpdate = 0;
 	return (ecs: IWorld, delta: number) => {
 		timeSinceLastTick += delta;
-		if(timeSinceLastTick < TIME_BETWEEN_TICKS) {
-			return ecs;
+		if(timeSinceLastTick > TIME_BETWEEN_TICKS && ships.length === 0) {
+			ships = movingQuery(ecs).filter(eid => !health.dead[eid]);
+			minCountToUpdate = ships.length / 2;
+			timeSinceLastTick = 0;
 		}
 
 		// @ts-expect-error
 		let quadtree = ecs.quadtree;
+		let start = performance.now();
 
 		// Use quadtree to see who we are colliding with
-		let ships = movingQuery(ecs);
-		ships.forEach(eid => {
-			if(health.dead[eid]) {
-				return;
-			}
+		for(let i = 0; i < ships.length; i++) {
+			let eid = ships[i];
 			let entitiesInRange = quadtree.retrieve(new Rectangle({
 				x: position.x[eid],
 				y: position.y[eid],
@@ -58,9 +60,16 @@ export default function collisionSystem(world: World) {
 				velocity.y[eid] = -velocity.y[eid];
 				position.angle[eid] = computeAngle(velocity.x[eid], velocity.y[eid]);
 			}
-		});
-		timeSinceLastTick = 0;
 
+			if(i % 10 === 0 && i > minCountToUpdate) {
+				if(performance.now() - start > (delta * 1_000 / 2)) {
+					ships = ships.slice(i);
+					return ecs;
+				}
+			}
+		}
+
+		ships = [];
 		return ecs;
 	};
 }

@@ -77,7 +77,7 @@ onMounted(() => {
 				let start = performance.now();
 				world.load(generateScene({
 					stations: 6,
-					shipsPerStation: 100,
+					shipsPerStation: 200,
 					width,
 					height
 				}));
@@ -158,7 +158,7 @@ onMounted(() => {
 					shipsCount.value = ships.length;
 					stationShips.value.forEach(val => {
 						let matchingStationEid = stations.find(eid => components.controller.color[eid] === val.color);
-						if(matchingStationEid) {
+						if(matchingStationEid !== undefined) {
 							val.ships = ships.filter(eid => components.controlled.owner[eid] === val.eid).length;
 						} else if(val.ships > 0) {
 							// paused = true;

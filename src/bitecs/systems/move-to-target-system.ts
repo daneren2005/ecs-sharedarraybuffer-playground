@@ -1,4 +1,4 @@
-import { defineQuery, hasComponent, IWorld } from 'bitecs';
+import { defineQuery, IWorld } from 'bitecs';
 import World from '../entities/world';
 import computeAngle from '@/math/compute-angle';
 const PhaserMath = require('phaser/src/math');

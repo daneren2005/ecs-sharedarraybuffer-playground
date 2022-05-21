@@ -15,20 +15,24 @@ export default function targetEnemySystem(world: World) {
 
 	const TIME_BETWEEN_TICKS = 0.2;
 	let timeSinceLastTick = TIME_BETWEEN_TICKS + 1;
+	let movingEntities: Array<number> = [];
+	let minCountToUpdate = 0;
 	return (ecs: IWorld, delta: number) => {
+		// Run through all of entities eventually, but don't have more than half a frame's time to do a block of them
 		timeSinceLastTick += delta;
-		if(timeSinceLastTick < TIME_BETWEEN_TICKS) {
-			return ecs;
+		if(timeSinceLastTick > TIME_BETWEEN_TICKS && movingEntities.length === 0) {
+			movingEntities = movingQuery(ecs).filter(eid => !health.dead[eid]);
+			minCountToUpdate = movingEntities.length / (TIME_BETWEEN_TICKS / delta);
+			timeSinceLastTick = 0;
 		}
 
 		// @ts-expect-error
 		let quadtree = ecs.quadtree;
+		let start = performance.now();
 
 		// Use quadtree to see who we are colliding with
-		movingQuery(ecs).forEach(eid => {
-			if(health.dead[eid]) {
-				return;
-			}
+		for(let i = 0; i < movingEntities.length; i++) {
+			let eid = movingEntities[i];
 			let shipColor = controller.color[controlled.owner[eid]];
 
 			// Try to find the nearest enemy
@@ -63,9 +67,17 @@ export default function targetEnemySystem(world: World) {
 			}
 
 			attack.target[eid] = enemy;
-		});
-		timeSinceLastTick = 0;
 
+			if(i % 10 === 0 && i > minCountToUpdate) {
+				// Check how long we have been running for
+				if(performance.now() - start > (delta * 1_000 / 2)) {
+					movingEntities = movingEntities.slice(i);
+					return ecs;
+				}
+			}
+		}
+
+		movingEntities = [];
 		return ecs;
 	};
 }

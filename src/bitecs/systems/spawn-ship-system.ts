@@ -9,7 +9,7 @@ export default function spawnShipSystem(world: World) {
 	const health = world.components.health;
 	let stationQuery = defineQuery([controller]);
 
-	return (ecs: IWorld, delta: number) => {
+	return (ecs: IWorld) => {
 		// TODO: Remove dependency on our containers so this could realistically be running in a simple worker with just duplicated data
 		let stations = stationQuery(ecs).filter(eid => !health.dead[eid]);
 		stations.forEach(stationEid => {
