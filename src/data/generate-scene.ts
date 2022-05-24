@@ -4,7 +4,11 @@ const colors = [
 	0xffffff,
 	0xff6d00,
 	0x76ff03,
-	0xaa00ff
+	0xaa00ff,
+	0x77e8de,
+	0xf3e28d,
+	0xde62ab,
+	0x39ab62
 ];
 
 export default function generateScene(options: OptionsConfig) {
