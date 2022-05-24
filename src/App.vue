@@ -1,5 +1,6 @@
 <template>
   <nav>
+	<router-link to="/multithreaded">Multithreaded</router-link> |
 	<router-link to="/bitecs">BitECS</router-link> |
     <router-link to="/simple">Simple Entity</router-link>
   </nav>

@@ -1,0 +1,1 @@
+export const INT_FLOAT_MULTIPLIER = 1_000.0;

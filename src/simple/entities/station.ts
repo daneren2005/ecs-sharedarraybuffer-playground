@@ -24,8 +24,8 @@ export default class Station extends Entity {
 			let ship = new Ship(this);
 			ship.x = this.x;
 			ship.y = this.y;
-			ship.velocityX = Math.random();
-			ship.velocityY = Math.random();
+			ship.velocityX = (Math.random() > 0.5 ? -1 : 1) * Math.random() * ship.speed;
+			ship.velocityY = (Math.random() > 0.5 ? -1 : 1) * Math.random() * ship.speed;
 
 			this.ships.push(ship);
 			ship.on('dead', () => {

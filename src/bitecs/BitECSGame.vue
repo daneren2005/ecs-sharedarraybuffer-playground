@@ -1,7 +1,7 @@
 <template>
 	<div class="home">
 		<div class="list">
-			<div>Startup time: {{ startupTime }} ms</div>
+			<div>Startup time: {{ startupTime.toFixed(2) }} ms</div>
 			<div>Update time: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
 			<p/>
 

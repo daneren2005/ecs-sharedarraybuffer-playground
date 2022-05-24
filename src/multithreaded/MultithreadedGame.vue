@@ -12,18 +12,19 @@
 			<button @click="addShips">Add Ships</button>
 		</div>
 
-		<div id="phaser-container-simple"/>
+		<div id="phaser-container-multithreaded"/>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
+import generateScene from '@/data/generate-scene';
 import World from './entities/world';
 import Entity from './entities/entity';
-import generateScene from '@/data/generate-scene';
 import Station from './entities/station';
 import Ship from './entities/ship';
+import { INT_FLOAT_MULTIPLIER } from './constants';
 
 let world = new World();
 const startupTime = ref(0);
@@ -32,7 +33,7 @@ const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
 const stationsCount = ref(0);
 const shipsCount = ref(0);
-const stationShips = ref([]) as Ref<Array<{ color: number, displayColor: string, ships: number }>>;
+const stationShips = ref([]) as Ref<Array<{ eid: number, color: number, displayColor: string, ships: number }>>;
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -42,11 +43,12 @@ onMounted(() => {
 	const width = window.innerWidth / 3 * 2;
 	const height = window.innerHeight / 3 * 2;
 	let paused = false;
+	const eidSpriteMap = new Map<number, any>();
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
 		width,
 		height,
-		parent: 'phaser-container-simple',
+		parent: 'phaser-container-multithreaded',
 		// @ts-expect-error
 		scene: {
 			preload() {
@@ -55,29 +57,18 @@ onMounted(() => {
 				this.load.image('shield', 'shield3.png');
 			},
 			create() {
+				// TODO: Be able to see added entities from outside threads
+				// TODO: We also need to be able to see entire load done BEFORE adding to display
 				world.on('entity-added', (entity: Entity) => {
-					let image = this.add.image(entity.x, entity.y, entity.key) as any;
-					image.setScale(entity.width / image.width, entity.height / image.height);
-					image.shieldImage = this.add.image(entity.x, entity.y, 'shield');
-					image.shieldImage.setScale(entity.width / image.shieldImage.width * 2, entity.height / image.shieldImage.height * 2);
+					let image = this.add.image(entity.x / INT_FLOAT_MULTIPLIER, entity.y / INT_FLOAT_MULTIPLIER, entity.key) as any;
+					image.setScale(entity.width / image.width / INT_FLOAT_MULTIPLIER, entity.height / image.height / INT_FLOAT_MULTIPLIER);
+					image.shieldImage = this.add.image(entity.x / INT_FLOAT_MULTIPLIER, entity.y / INT_FLOAT_MULTIPLIER, 'shield');
+					image.shieldImage.setScale(entity.width / image.shieldImage.width / INT_FLOAT_MULTIPLIER * 2, entity.height / image.shieldImage.height / INT_FLOAT_MULTIPLIER * 2);
 					image.shieldImage.visible = entity.shields > 0;
 					if(entity instanceof Station || entity instanceof Ship) {
 						image.setTint(entity.color);
 					}
-
-					['x', 'y', 'angle'].forEach(prop => {
-						entity.on(`${prop}-updated`, (newValue: any) => {
-							image[prop] = newValue;
-							image.shieldImage[prop] = newValue;
-						});
-					});
-					entity.on('dead', () => {
-						image.destroy();
-						image.shieldImage.destroy();
-					});
-					entity.on('shields-updated', (newValue: number) => {
-						image.shieldImage.visible = newValue > 0;
-					});
+					eidSpriteMap.set(entity.eid, image);
 				});
 
 				let start = performance.now();
@@ -90,17 +81,19 @@ onMounted(() => {
 				let end = performance.now();
 				startupTime.value = end - start;
 
-				let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
-				stationShips.value = stations.map(station => {
-					let displayColor = '#' + station.color.toString(16);
+				let stations = world.getEntitiesWithComponents(['controller']);
+				stationShips.value = stations.map(eid => {
+					let color = world.components.controller.color[eid];
+					let displayColor = '#' + color.toString(16);
 					if(displayColor === '#ffffff') {
 						displayColor = '#00000';
 					}
 
 					return {
-						color: station.color,
+						eid,
+						color,
 						displayColor,
-						ships: station.ships.length
+						ships: 0
 					};
 				});
 
@@ -114,12 +107,30 @@ onMounted(() => {
 				}
 
 				let start = performance.now();
-				world.update(delta / 1_000);
+				world.update(delta);
+
+				world.getAllEntitiesWithComponents(['position', 'health']).forEach(eid => {
+					let image = eidSpriteMap.get(eid);
+					if(!image) {
+						return;
+					}
+
+					image.x = image.shieldImage.x = (world.components.position.x[eid] / INT_FLOAT_MULTIPLIER);
+					image.y = image.shieldImage.y = (world.components.position.y[eid] / INT_FLOAT_MULTIPLIER);
+					image.angle = image.shieldImage.angle = world.components.position.angle[eid];
+					
+					image.shieldImage.visible = world.components.health.shields[eid] > 0;
+					if(world.components.entity.dead[eid]) {
+						image.destroy();
+						image.shieldImage.destroy();
+						eidSpriteMap.delete(eid);
+					}
+				});
 				let end = performance.now();
 
 				updateTimes.push(end - start);
 				updateTicks += delta;
-				if(updateTicks > 1_000) {
+				if(updateTicks > INT_FLOAT_MULTIPLIER) {
 					minUpdateTime.value = updateTimes.reduce((min, time) => {
 						return Math.min(min, time);
 					}, 1_000_000);
@@ -132,14 +143,15 @@ onMounted(() => {
 					updateTimes = [];
 					updateTicks = 0;
 
-					stationsCount.value = world.entities.filter(entity => entity instanceof Station).length;
-					shipsCount.value = world.entities.filter(entity => entity instanceof Ship).length;
+					let stations = world.getEntitiesWithComponents(['controller']);
+					let ships = world.getEntitiesWithComponents(['controlled']);
+					stationsCount.value = stations.length;
+					shipsCount.value = ships.length;
 
-					let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
 					stationShips.value.forEach(val => {
-						let matchingStation = stations.find(station => station.color === val.color);
-						if(matchingStation) {
-							val.ships = matchingStation.ships.length;
+						let matchingStationEid = stations.find(eid => world.components.controller.color[eid] === val.color);
+						if(matchingStationEid !== undefined) {
+							val.ships = ships.filter(eid => world.components.controlled.owner[eid] === val.eid).length;
 						} else if(val.ships > 0) {
 							// paused = true;
 							val.ships = 0;
@@ -158,9 +170,8 @@ onBeforeUnmount(() => {
 });
 
 function addShips() {
-	let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
-	stations.forEach(station => {
-		station.set('money', station.money + 10);
+	world.getEntitiesWithComponents(['controller']).forEach(eid => {
+		world.components.controller.money[eid] += 10;
 	});
 }
 </script>

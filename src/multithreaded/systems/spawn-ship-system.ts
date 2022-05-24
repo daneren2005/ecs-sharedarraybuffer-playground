@@ -1,32 +1,28 @@
 import computeAngle from '@/math/compute-angle';
-import { defineQuery, IWorld } from 'bitecs';
+import { INT_FLOAT_MULTIPLIER } from '../constants';
 import Ship from '../entities/ship';
-import Station from '../entities/station';
 import World from '../entities/world';
 
 export default function spawnShipSystem(world: World) {
 	const controller = world.components.controller;
-	const health = world.components.health;
-	let stationQuery = defineQuery([controller]);
+	const position = world.components.position;
+	const velocity = world.components.velocity;
 
-	return (ecs: IWorld) => {
+	return () => {
 		// TODO: Remove dependency on our containers so this could realistically be running in a simple worker with just duplicated data
-		let stations = stationQuery(ecs).filter(eid => !health.dead[eid]);
+		let stations = world.getEntitiesWithComponents(['controller']);
 		stations.forEach(stationEid => {
-			let station = world.getEntity(stationEid) as Station;
 			if(controller.money[stationEid] > 0) {
-				let ship = new Ship(station);
-				ship.x = station.x;
-				ship.y = station.y;
+				let ship = new Ship(world, stationEid);
+				ship.x = position.x[stationEid];
+				ship.y = position.y[stationEid];
 				ship.velocityX = (Math.random() > 0.5 ? -1 : 1) * Math.random() * world.components.velocity.speed[ship.eid];
 				ship.velocityY = (Math.random() > 0.5 ? -1 : 1) * Math.random() * world.components.velocity.speed[ship.eid];
-				world.components.position.angle[ship.eid] = computeAngle(ship.velocityX, ship.velocityY);
+				position.angle[ship.eid] = computeAngle(ship.velocityX, ship.velocityY);
 
 				world.addEntity(ship);
 				controller.money[stationEid]--;
 			}
 		});
-
-		return ecs;
 	};
 }
