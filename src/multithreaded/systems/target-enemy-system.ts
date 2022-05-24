@@ -48,17 +48,17 @@ export default function targetEnemySystem(world: World) {
 
 			// Try to find the nearest enemy
 			let rect = {
-				x: position.x[eid] - 50,
-				y: position.y[eid] - 50,
-				width: position.width[eid] + 100,
-				height: position.height[eid] + 100
+				x: position.x[eid] - 50 * INT_FLOAT_MULTIPLIER,
+				y: position.y[eid] - 50 * INT_FLOAT_MULTIPLIER,
+				width: position.width[eid] + 100 * INT_FLOAT_MULTIPLIER,
+				height: position.height[eid] + 100 * INT_FLOAT_MULTIPLIER
 			};
 			let enemies = getEnemiesInRange(quadtree, world, rect, eid, shipColor);
 			if(enemies.length === 0) {
-				rect.x -= 100;
-				rect.y -= 100;
-				rect.width += 200;
-				rect.height += 200;
+				rect.x -= 100 * INT_FLOAT_MULTIPLIER;
+				rect.y -= 100 * INT_FLOAT_MULTIPLIER;
+				rect.width += 200 * INT_FLOAT_MULTIPLIER;
+				rect.height += 200 * INT_FLOAT_MULTIPLIER;
 				enemies = getEnemiesInRange(quadtree, world, rect, eid, shipColor);
 			}
 	
