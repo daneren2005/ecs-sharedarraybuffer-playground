@@ -18,7 +18,7 @@ export default function moveToTargetSystem(world: World) {
 			}
 
 			let force = getMoveTowardsForce(position, eid, target);
-			let newVelocity = new PhaserMath.Vector2(velocity.x[eid] + force.x * 2, velocity.y[eid] + force.y * 2);
+			let newVelocity = new PhaserMath.Vector2(velocity.x[eid] + force.x * 4, velocity.y[eid] + force.y * 4);
 			newVelocity.normalize();
 
 			velocity.x[eid] = newVelocity.x * velocity.speed[eid];

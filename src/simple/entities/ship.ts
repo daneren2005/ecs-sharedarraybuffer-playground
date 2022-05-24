@@ -34,7 +34,7 @@ export default class Ship extends Entity {
 			// Move towards enemy
 			else {
 				let force = this.getMoveTowardsForce(nearesetEnemy);
-				let newVelocity = new PhaserMath.Vector2(this.velocityX + force.x * 2, this.velocityY + force.y * 2);
+				let newVelocity = new PhaserMath.Vector2(this.velocityX + force.x * 4, this.velocityY + force.y * 4);
 				newVelocity.normalize();
 
 				this.set('velocityX', newVelocity.x * this.speed);
