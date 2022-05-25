@@ -2,6 +2,7 @@ import World from '../entities/world';
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
 import euclideanDistance from '@/math/euclidean-distance';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
+import { getEntitiesWithComponents, hasComponent } from '../components/get-entities';
 
 export default function targetEnemySystem(world: World) {
 	const position = world.components.position;
@@ -18,7 +19,7 @@ export default function targetEnemySystem(world: World) {
 		// Run through all of entities eventually, but don't have more than half a frame's time to do a block of them
 		timeSinceLastTick += delta;
 		if(timeSinceLastTick > TIME_BETWEEN_TICKS && movingEntities.length === 0) {
-			movingEntities = world.getEntitiesWithComponents(['velocity', 'attack']);
+			movingEntities = getEntitiesWithComponents(world, ['velocity', 'attack']);
 			minCountToUpdate = movingEntities.length / (TIME_BETWEEN_TICKS / delta);
 			timeSinceLastTick = 0;
 		}
@@ -29,7 +30,7 @@ export default function targetEnemySystem(world: World) {
 			width: world.bounds.width * INT_FLOAT_MULTIPLIER,
 			height: world.bounds.height * INT_FLOAT_MULTIPLIER
 		});
-		world.getEntitiesWithComponents(['position', 'health']).forEach(eid => {
+		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
 			quadtree.insert(new Rectangle({
 				x: Atomics.load(position.x, eid),
 				y: Atomics.load(position.y, eid),
@@ -69,7 +70,7 @@ export default function targetEnemySystem(world: World) {
 
 			// If no enemies that quadtree could easily find, just head for the nearest station
 			if(!enemy) {
-				let stations = world.getEntitiesWithComponents(['controller']).filter(stationEid => controller.color[stationEid] !== shipColor && !world.components.entity.dead[stationEid]);
+				let stations = getEntitiesWithComponents(world, ['controller']).filter(stationEid => controller.color[stationEid] !== shipColor && !world.components.entity.dead[stationEid]);
 				stations.sort((a, b) => {
 					return euclideanDistance(position.x[a], position.y[a], position.x[eid], position.y[eid]) - euclideanDistance(position.x[b], position.y[b], position.x[eid], position.y[eid]);
 				});
@@ -99,12 +100,12 @@ function getEnemiesInRange(quadtree: any, world: World, range: { x: number, y: n
 	let entitiesInRange = quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data.eid).filter((otherEid: number) => otherEid !== eid);
 	return entitiesInRange.filter((otherEid: number) => {
 		// Ship
-		if(world.hasComponent(otherEid, 'controlled')) {
+		if(hasComponent(world.components, otherEid, 'controlled')) {
 			let stationEid = controlled.owner[otherEid];
 			return controller.color[stationEid] !== shipColor;
 		}
 		// Station
-		else if(world.hasComponent(otherEid, 'controller')) {
+		else if(hasComponent(world.components, otherEid, 'controller')) {
 			return controller.color[otherEid] !== shipColor;
 		} else {
 			return false;

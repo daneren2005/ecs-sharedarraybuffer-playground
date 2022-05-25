@@ -3,6 +3,7 @@ import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
 import distance from '@/math/distance';
 import computeAngle from '@/math/compute-angle';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
+import { getEntitiesWithComponents, hasComponent } from '../components/get-entities';
 
 export default function collisionSystem(world: World) {
 	const position = world.components.position;
@@ -18,7 +19,7 @@ export default function collisionSystem(world: World) {
 	return (delta: number) => {
 		timeSinceLastTick += delta;
 		if(timeSinceLastTick > TIME_BETWEEN_TICKS && ships.length === 0) {
-			ships = world.getEntitiesWithComponents(['velocity']);
+			ships = getEntitiesWithComponents(world, ['velocity']);
 			minCountToUpdate = ships.length / 2;
 			timeSinceLastTick = 0;
 		}
@@ -29,7 +30,7 @@ export default function collisionSystem(world: World) {
 			width: world.bounds.width * INT_FLOAT_MULTIPLIER,
 			height: world.bounds.height * INT_FLOAT_MULTIPLIER
 		});
-		world.getEntitiesWithComponents(['position', 'health']).forEach(eid => {
+		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
 			quadtree.insert(new Rectangle({
 				x: Atomics.load(position.x, eid),
 				y: Atomics.load(position.y, eid),
@@ -53,12 +54,12 @@ export default function collisionSystem(world: World) {
 			let shipColor = controller.color[controlled.owner[eid]];
 			let enemiesInRange = entitiesInRange.filter((otherEid: number) => {
 				// Ship
-				if(world.hasComponent(otherEid, 'controlled')) {
+				if(hasComponent(world.components, otherEid, 'controlled')) {
 					let stationEid = controlled.owner[otherEid];
 					return controller.color[stationEid] !== shipColor;
 				}
 				// Station
-				else if(world.hasComponent(otherEid, 'controller')) {
+				else if(hasComponent(world.components, otherEid, 'controller')) {
 					return controller.color[otherEid] !== shipColor;
 				} else {
 					return false;
@@ -91,7 +92,7 @@ function collide(world: World, ships: Array<number>, eid: number, target: number
 	}
 
 	let enemyWorth = 1;
-	if(world.hasComponent(target, 'controller')) {
+	if(hasComponent(world.components, target, 'controller')) {
 		enemyWorth = ships.filter(eid => world.components.controlled.owner[eid] === target).length;
 	}
 
@@ -105,12 +106,12 @@ function collide(world: World, ships: Array<number>, eid: number, target: number
 	}
 	if(world.components.entity.dead[eid]) {
 		// Ship
-		if(world.hasComponent(target, 'controlled')) {
+		if(hasComponent(world.components, target, 'controlled')) {
 			let stationEid = controlled.owner[target];
 			world.components.controller.money[stationEid] += 1;
 		}
 		// Station
-		else if(world.hasComponent(target, 'controller')) {
+		else if(hasComponent(world.components, target, 'controller')) {
 			world.components.controller.money[target] += 1;
 		}
 	}
@@ -124,7 +125,7 @@ function takeDamage(world: World, ships: Array<number>, eid: number, damage: num
 
 		// TODO: Removing makes it so our change query doesn't detect that these are gone
 		// world.removeEntity(eid);
-		if(world.hasComponent(eid, 'controller')) {
+		if(hasComponent(world.components, eid, 'controller')) {
 			let controlledShips = ships.filter(shipEid => world.components.controlled.owner[shipEid] === eid);
 			controlledShips.forEach(shipEid => {
 				world.components.entity.dead[shipEid] = 1;

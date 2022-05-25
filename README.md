@@ -15,10 +15,18 @@ All of the logic is contained within each entitie's update method.  This is goin
 https://daneren2005.github.io/ecs-arraybuffer/#/simple
 
 ## BitECS
-This is a rewrite using a ECS framework: https://github.com/NateTheGreatt/bitECS.  I don't think that it claims to be the fastest one around, but I'm pretty sure it is fast enough to representative of an ECS framework.  This implementation runs the different systems at different rates (ie: velocity every tick, but collisions every other tick, and deciding where to go next only a few times a second).  This is possible to do in the simple entity implementation as well, but ECS makes it way easier.  This helped the average framerate a lot, but didn't really help the hiccups much since taking 40ms to do something once every few hundred ms still causes visual stutters.  Could fix this by running in chunks every frame until done instead.
+This is a rewrite using a ECS framework: https://github.com/NateTheGreatt/bitECS.  I don't think that it claims to be the fastest one around, but I'm pretty sure it is fast enough to representative of an ECS framework.  This implementation runs the different systems at different rates (ie: velocity every tick, but collisions every other tick, and deciding where to go next only a few times a second).  This is possible to do in the simple entity implementation as well, but ECS makes it way easier.  Heavy systems are run in chunks so that if we can finish the run in 10ms increments over the 200ms runtime, the framerate stays good.  If we end up needing more than 200ms to compute the system, it runs until it is done in order to not get too far behind.  This puts an upper limit on how many entities we can process before it starts to stutter.
 
 This is my first attempt to use an ECS system, and I think I tried to hard to copy paste the simple version's logic.  A lot of this involves referencing the components in hard to follow ways, and the type system for bitecs got confused pretty easily.  This would probably look significantly better if I had just done this without my world/entity wrapper.
 
 https://daneren2005.github.io/ecs-arraybuffer/#/bitecs
 
-## TODO: Custom ECS backed by SharedArrayBuffers
+## Custom ECS backed by SharedArrayBuffers
+In this version, we have a quick and dirty ECS system where the components are hard coded and each SharedArrayBuffer is a large fixed length int array.  Each component is using SharedArrayBuffers and Atomics to load and update properties.  Each system runs in it's own thread.
+
+
+### Gotchas
+* Atomics only supports integers - POC used / 1000 for 4 decimal places, but reduces how big the numbers can be and possibly isn't precise enough in some cases.  It also adds it's own mental and computational overhead and makes the code uglier.
+* Webpack sucks at bundling imports for workers - basically ended up having to include every function that we need in a system in a single file to get it to work.  This won't scale very well.
+* Entity ids aren't recycled so eventually simulation will crash due to exceeding the default buffer size.
+* Copied bitECS way of having a single entity id used in components even though not all entities use every component.  Going to end up with a lot of wasted memory.

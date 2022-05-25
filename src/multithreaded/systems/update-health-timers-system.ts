@@ -1,3 +1,4 @@
+import { getEntitiesWithComponents } from '../components/get-entities';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
 import World from '../entities/world';
 
@@ -5,7 +6,7 @@ export default function updateHealthTimersSystem(world: World) {
 	const health = world.components.health;
 
 	return (delta: number) => {
-		world.getEntitiesWithComponents(['health']).forEach(eid => {
+		getEntitiesWithComponents(world, ['health']).forEach(eid => {
 			Atomics.add(health.timeSinceTakenDamage, eid, delta * INT_FLOAT_MULTIPLIER);
 
 			if(health.shields[eid] < health.maxShields[eid]) {

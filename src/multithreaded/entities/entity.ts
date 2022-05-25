@@ -1,4 +1,5 @@
 import { EventEmitter } from 'eventemitter3';
+import { getTypeBits } from '../components/get-entities';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
 import World from './world';
 
@@ -58,13 +59,7 @@ export default class Entity extends EventEmitter {
 		});
 	}
 
-	addComponent(type: string) {
-		Atomics.or(this.world.components.entity.components, this.eid, this.world.getTypeBit(type));
-	}
 	addComponents(types: Array<string>) {
-		Atomics.or(this.world.components.entity.components, this.eid, this.world.getTypeBits(types));
-	}
-	hasComponent(type: string) {
-		return (Atomics.load(this.world.components.entity.components, this.eid) & this.world.getTypeBit(type)) > 0;
+		Atomics.or(this.world.components.entity.components, this.eid, getTypeBits(types));
 	}
 }

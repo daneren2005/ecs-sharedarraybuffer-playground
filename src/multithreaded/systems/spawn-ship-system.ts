@@ -1,16 +1,15 @@
 import computeAngle from '@/math/compute-angle';
-import { INT_FLOAT_MULTIPLIER } from '../constants';
+import { getEntitiesWithComponents } from '../components/get-entities';
 import Ship from '../entities/ship';
 import World from '../entities/world';
 
 export default function spawnShipSystem(world: World) {
 	const controller = world.components.controller;
 	const position = world.components.position;
-	const velocity = world.components.velocity;
 
 	return () => {
 		// TODO: Remove dependency on our containers so this could realistically be running in a simple worker with just duplicated data
-		let stations = world.getEntitiesWithComponents(['controller']);
+		let stations = getEntitiesWithComponents(world, ['controller']);
 		stations.forEach(stationEid => {
 			if(controller.money[stationEid] > 0) {
 				let ship = new Ship(world, stationEid);

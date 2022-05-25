@@ -7,53 +7,25 @@ import collisionSystem from '../systems/collision-system';
 import updateHealthTimersSystem from '../systems/update-health-timers-system';
 import moveToTargetSystem from '../systems/move-to-target-system';
 import targetEnemySystem from '../systems/target-enemy-system';
+import Components from '../components/components';
+import WorldConfig from './world-config';
+import { getEntitiesWithComponents, getTypeBit, getTypeBits, hasComponent } from '../components/get-entities';
 
 export default class World extends EventEmitter {
-	// TODO: Change bounds to be a SharedArrayBuffer we can pass to workers
 	bounds: {
 		width: number,
 		height: number
 	} = { width: 0, height: 0 };
-	idCounter = 0;
-	components: {
-		entity: {
-			components: Int32Array,
-			dead: Int32Array
-		},
-		position: {
-			x: Int32Array,
-			y: Int32Array,
-			width: Int32Array,
-			height: Int32Array,
-			angle: Int32Array
-		},
-		velocity: {
-			x: Int32Array,
-			y: Int32Array,
-			speed: Int32Array
-		},
-		health: {
-			shields: Int32Array,
-			maxShields: Int32Array,
-			timeToRegenerateShields: Int32Array,
-			timeSinceShieldRegeneration: Int32Array,
-			timeSinceTakenDamage: Int32Array
-		},
-		controller: {
-			color: Int32Array,
-			money: Int32Array
-		},
-		controlled: {
-			owner: Int32Array
-		},
-		attack: {
-			target: Int32Array
-		}
-	};
+	idCounter: Int32Array;
+	components: Components;
 	systems: Array<(delta: number) => void> = [];
+	workers: Array<Worker> = [];
 
 	constructor() {
 		super();
+
+		let idCounter = new SharedArrayBuffer(4);
+		this.idCounter = new Int32Array(idCounter);
 
 		this.components = {
 			entity: {
@@ -92,7 +64,7 @@ export default class World extends EventEmitter {
 		};
 
 		this.systems.push(spawnShipSystem(this));
-		this.systems.push(velocitySystem(this));
+		this.startSystemWorker(velocitySystem);
 		this.systems.push(collisionSystem(this));
 		this.systems.push(updateHealthTimersSystem(this));
 		this.systems.push(targetEnemySystem(this));
@@ -122,74 +94,81 @@ export default class World extends EventEmitter {
 		if(config.bounds) {
 			this.bounds = config.bounds;
 		}
+
+		this.workers.forEach(worker => {
+			worker.postMessage({
+				updateWorld: {
+					bounds: this.bounds
+				}
+			});
+		});
 	}
 	addEntity(entity: Entity) {
 		this.emit('entity-added', entity);
 	}
-	getEntitiesWithComponents(types: Array<string>) {
-		let typeBits = this.getTypeBits(types);
-
-		let eids = [];
-		for(let eid = 0; eid <= this.idCounter; eid++) {
-			if((Atomics.load(this.components.entity.components, eid) & typeBits) === typeBits && Atomics.load(this.components.entity.dead, eid) === 0) {
-				eids.push(eid);
-			}
-		}
-
-		return eids;
-	}
-	getAllEntitiesWithComponents(types: Array<string>) {
-		let typeBits = this.getTypeBits(types);
-
-		let eids = [];
-		for(let eid = 0; eid <= this.idCounter; eid++) {
-			if((Atomics.load(this.components.entity.components, eid) & typeBits) === typeBits) {
-				eids.push(eid);
-			}
-		}
-
-		return eids;
-	}
-	hasComponent(eid: number, type: string) {
-		return (Atomics.load(this.components.entity.components, eid) & this.getTypeBit(type)) > 0;
-	}
-	getTypeBits(types: Array<string>): number {
-		let typeBits = 0;
-		types.forEach(type => {
-			typeBits |= this.getTypeBit(type);
-		});
-
-		return typeBits;
-	}
-	getTypeBit(type: string): number {
-		switch(type) {
-			case 'entity':
-				return 1;
-			case 'position':
-				return 2 ** 1;
-			case 'velocity':
-				return 2 ** 2;
-			case 'health':
-				return 2 ** 3;
-			case 'controller':
-				return 2 ** 4;
-			case 'controlled':
-				return 2 ** 5;
-			case 'attack':
-				return 2 ** 6;
-			default:
-				return 0;
-		}
-	}
 
 	getId() {
-		this.idCounter++;
-		return this.idCounter;
+		return Atomics.add(this.idCounter, 0, 1) + 1;
 	}
 
 	update(delta: number) {
 		this.systems.forEach(system => {
 			system(delta);
 		});
+	}
+
+	async startSystemWorker(func: any) {
+		let functionName = func.name;
+		let inlineString = `
+
+		(
+			${
+				(() => {
+					let world: any;
+					let system = (delta: number) => { console.warn('Updating system before sent'); };
+
+					self.onmessage = function(e) {
+						if(e.data.world) {
+							let functionName = e.data.functionName;
+							world = e.data.world;
+							// @ts-expect-error
+							system = self[functionName](world);
+						} else if(e.data.updateWorld) {
+							Object.keys(e.data.updateWorld).forEach(key => {
+								world[key] = e.data.updateWorld[key];
+							});
+						} else if(e.data.delta) {
+							system(e.data.delta);
+						}
+					};
+				}).toString()
+			}
+		)()
+
+		${func.toString()}
+		${getEntitiesWithComponents.toString()}
+		${getTypeBit.toString()}
+		${getTypeBits.toString()}
+		${hasComponent.toString()}`;
+
+		let blob = new Blob([inlineString], { type: 'text/javascript' });
+		let worker = new Worker(window.URL.createObjectURL(blob));
+		this.systems.push((delta) => {
+			worker.postMessage({
+				delta
+			});
+		});
+
+		let config: WorldConfig = {
+			idCounter: this.idCounter,
+			bounds: this.bounds,
+			components: this.components
+		};
+
+		worker.postMessage({
+			functionName,
+			world: config
+		});
+		this.workers.push(worker);
 	}
 }

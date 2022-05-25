@@ -1,5 +1,6 @@
 import World from '../entities/world';
 import computeAngle from '@/math/compute-angle';
+import { getEntitiesWithComponents } from '../components/get-entities';
 const PhaserMath = require('phaser/src/math');
 
 export default function moveToTargetSystem(world: World) {
@@ -8,7 +9,7 @@ export default function moveToTargetSystem(world: World) {
 	const attack = world.components.attack;
 
 	return () => {
-		world.getEntitiesWithComponents(['velocity', 'attack']).forEach(eid => {
+		getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
 			let target = attack.target[eid];
 			if(!target || world.components.entity.dead[target]) {
 				return;

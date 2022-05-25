@@ -25,6 +25,7 @@ import Entity from './entities/entity';
 import Station from './entities/station';
 import Ship from './entities/ship';
 import { INT_FLOAT_MULTIPLIER } from './constants';
+import { getAllEntitiesWithComponents, getEntitiesWithComponents } from './components/get-entities';
 
 let world = new World();
 const startupTime = ref(0);
@@ -73,7 +74,7 @@ onMounted(() => {
 
 				let start = performance.now();
 				world.load(generateScene({
-					stations: 6,
+					stations: 10,
 					shipsPerStation: 100,
 					width,
 					height
@@ -81,7 +82,7 @@ onMounted(() => {
 				let end = performance.now();
 				startupTime.value = end - start;
 
-				let stations = world.getEntitiesWithComponents(['controller']);
+				let stations = getEntitiesWithComponents(world, ['controller']);
 				stationShips.value = stations.map(eid => {
 					let color = world.components.controller.color[eid];
 					let displayColor = '#' + color.toString(16);
@@ -109,7 +110,7 @@ onMounted(() => {
 				let start = performance.now();
 				world.update(delta);
 
-				world.getAllEntitiesWithComponents(['position', 'health']).forEach(eid => {
+				getAllEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
 					let image = eidSpriteMap.get(eid);
 					if(!image) {
 						return;
@@ -143,8 +144,8 @@ onMounted(() => {
 					updateTimes = [];
 					updateTicks = 0;
 
-					let stations = world.getEntitiesWithComponents(['controller']);
-					let ships = world.getEntitiesWithComponents(['controlled']);
+					let stations = getEntitiesWithComponents(world, ['controller']);
+					let ships = getEntitiesWithComponents(world, ['controlled']);
 					stationsCount.value = stations.length;
 					shipsCount.value = ships.length;
 
@@ -170,7 +171,7 @@ onBeforeUnmount(() => {
 });
 
 function addShips() {
-	world.getEntitiesWithComponents(['controller']).forEach(eid => {
+	getEntitiesWithComponents(world, ['controller']).forEach(eid => {
 		world.components.controller.money[eid] += 10;
 	});
 }
