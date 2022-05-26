@@ -9,5 +9,6 @@ module.exports = defineConfig({
 				'Cross-Origin-Embedder-Policy': 'require-corp'
 			}
 		}
-	}
+	},
+	chainWebpack: config => config.optimization.minimize(false)
 });
