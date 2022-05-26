@@ -9,7 +9,7 @@ import moveToTargetSystem from '../systems/move-to-target-system';
 import targetEnemySystem from '../systems/target-enemy-system';
 import Components from '../components/components';
 import WorldConfig from './world-config';
-import { getEntitiesWithComponents, getTypeBit, getTypeBits, hasComponent } from '../components/get-entities';
+import { getEntitiesWithComponents, getTypeBit, getTypeBits, hasComponent, addComponents } from '../components/get-entities';
 
 export default class World extends EventEmitter {
 	bounds: {
@@ -19,17 +19,17 @@ export default class World extends EventEmitter {
 	idCounter: Int32Array;
 	components: Components;
 	systems: Array<(delta: number) => void> = [];
+	systemUpdates: { [s: string]: Array<number> } = {};
 	workers: Array<Worker> = [];
 
 	constructor() {
 		super();
-
-		let idCounter = new SharedArrayBuffer(4);
-		this.idCounter = new Int32Array(idCounter);
+		this.idCounter = this.createIntegerArray(4);
 
 		this.components = {
 			entity: {
 				components: this.createIntegerArray(),
+				init: this.createIntegerArray(),
 				dead: this.createIntegerArray()
 			},
 			position: {
@@ -63,16 +63,18 @@ export default class World extends EventEmitter {
 			}
 		};
 
-		this.systems.push(spawnShipSystem(this));
-		this.startSystemWorker(velocitySystem);
-		this.systems.push(collisionSystem(this));
-		this.systems.push(updateHealthTimersSystem(this));
-		this.systems.push(targetEnemySystem(this));
-		this.systems.push(moveToTargetSystem(this));
+		this.addSystemWorker(spawnShipSystem);
+		this.addSystemWorker(velocitySystem);
+		// TODO: Shard into 2 collision threads
+		this.addSystemWorker(collisionSystem);
+		this.addSystemWorker(updateHealthTimersSystem);
+		// TODO: Shard into 2-4 targeting threads
+		this.addSystemWorker(targetEnemySystem);
+		this.addSystemWorker(moveToTargetSystem);
 	}
 	// TODO: Resize buffers as we grow in size and recycle dead ids instead of requiring such a ridiculously huge buffer
 	private createIntegerArray(size = 65_536) {
-		let buffer = new SharedArrayBuffer(size);
+		let buffer = new SharedArrayBuffer(size * Int32Array.BYTES_PER_ELEMENT);
 		return new Int32Array(buffer);
 	}
 
@@ -88,7 +90,6 @@ export default class World extends EventEmitter {
 					break;
 			}
 			entity.load(entityConfig);
-			this.addEntity(entity);
 		});
 
 		if(config.bounds) {
@@ -103,9 +104,6 @@ export default class World extends EventEmitter {
 			});
 		});
 	}
-	addEntity(entity: Entity) {
-		this.emit('entity-added', entity);
-	}
 
 	getId() {
 		return Atomics.add(this.idCounter, 0, 1) + 1;
@@ -117,7 +115,15 @@ export default class World extends EventEmitter {
 		});
 	}
 
-	async startSystemWorker(func: any) {
+	addSystem(name: string, update: (delta: number) => void) {
+		this.systems.push((delta: number) => {
+			let start = performance.now();
+			update(delta);
+			this.systemUpdates[name].push(performance.now() - start);
+		});
+		this.systemUpdates[name] = [];
+	}
+	addSystemWorker(func: any) {
 		let functionName = func.name;
 		let inlineString = `
 
@@ -139,6 +145,10 @@ export default class World extends EventEmitter {
 							});
 						} else if(e.data.delta) {
 							system(e.data.delta);
+
+							self.postMessage({
+								done: true
+							});
 						}
 					};
 				}).toString()
@@ -149,14 +159,25 @@ export default class World extends EventEmitter {
 		${getEntitiesWithComponents.toString()}
 		${getTypeBit.toString()}
 		${getTypeBits.toString()}
-		${hasComponent.toString()}`;
+		${hasComponent.toString()}
+		${addComponents.toString()}`;
 
+		let start = 0;
+		let missedDeltas = 0;
 		let blob = new Blob([inlineString], { type: 'text/javascript' });
 		let worker = new Worker(window.URL.createObjectURL(blob));
 		this.systems.push((delta) => {
+			// We don't want to try to update while it is still executing the last update
+			if(start) {
+				missedDeltas += delta;
+				return;
+			}
+
+			start = performance.now();
 			worker.postMessage({
-				delta
+				delta: delta + missedDeltas
 			});
+			missedDeltas = 0;
 		});
 
 		let config: WorldConfig = {
@@ -164,11 +185,25 @@ export default class World extends EventEmitter {
 			bounds: this.bounds,
 			components: this.components
 		};
+		this.systemUpdates[functionName] = [];
 
 		worker.postMessage({
 			functionName,
 			world: config
 		});
+		worker.onmessage = (e) => {
+			if(e.data.done) {
+				this.systemUpdates[functionName].push(performance.now() - start);
+				start = 0;
+			}
+		};
 		this.workers.push(worker);
+	}
+
+	destroy() {
+		this.workers.forEach(worker => {
+			worker.terminate();
+		});
+		this.workers = [];
 	}
 }

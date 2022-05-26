@@ -1,114 +1,142 @@
-import World from '../entities/world';
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
-import euclideanDistance from '@/math/euclidean-distance';
-import { INT_FLOAT_MULTIPLIER } from '../constants';
 import { getEntitiesWithComponents, hasComponent } from '../components/get-entities';
+import Components from '../components/components';
+import WorldConfig from '../entities/world-config';
 
-export default function targetEnemySystem(world: World) {
+globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
+globalThis.hasComponent = hasComponent;
+globalThis.Quadtree = Quadtree;
+globalThis.Rectangle = Rectangle;
+
+export default function targetEnemySystem(world: WorldConfig) {
 	const position = world.components.position;
 	const controlled = world.components.controlled;
 	const controller = world.components.controller;
 	const attack = world.components.attack;
 
-	const TIME_BETWEEN_TICKS = 200;
-	let timeSinceLastTick = TIME_BETWEEN_TICKS + 1;
-	let movingEntities: Array<number> = [];
-	let minCountToUpdate = 0;
-	return (delta: number) => {
-		// TODO: Don't wait a full 200ms to process ships that are just sitting there waiting
-		// Run through all of entities eventually, but don't have more than half a frame's time to do a block of them
-		timeSinceLastTick += delta;
-		if(timeSinceLastTick > TIME_BETWEEN_TICKS && movingEntities.length === 0) {
-			movingEntities = getEntitiesWithComponents(world, ['velocity', 'attack']);
-			minCountToUpdate = movingEntities.length / (TIME_BETWEEN_TICKS / delta);
-			timeSinceLastTick = 0;
-		}
+	if(globalThis.importScripts) {
+		globalThis.importScripts('https://cdn.jsdelivr.net/npm/@timohausmann/quadtree-ts/dist/quadtree.umd.full.js');
+		globalThis.Rectangle = globalThis.Quadtree.Rectangle;
+	}
 
-		let start = performance.now();
+	return () => {
 		// Create and populate quadtree
-		let quadtree = new Quadtree({
-			width: world.bounds.width * INT_FLOAT_MULTIPLIER,
-			height: world.bounds.height * INT_FLOAT_MULTIPLIER
+		let quadtree = new globalThis.Quadtree({
+			width: world.bounds.width * 1_000,
+			height: world.bounds.height * 1_000
 		});
-		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
-			quadtree.insert(new Rectangle({
+		globalThis.getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
+			let data = {
 				x: Atomics.load(position.x, eid),
 				y: Atomics.load(position.y, eid),
 				width: Atomics.load(position.width, eid),
-				height: Atomics.load(position.height, eid),
+				height: Atomics.load(position.height, eid)
+			};
+
+			quadtree.insert(new globalThis.Rectangle({
+				...data,
 				data: {
-					eid
+					eid,
+					...data
 				}
 			}));
 		});
 
-		// Use quadtree to see who we are colliding with
-		for(let i = 0; i < movingEntities.length; i++) {
-			let eid = movingEntities[i];
-			let shipColor = controller.color[controlled.owner[eid]];
+		// TODO: Don't wait a full 200ms to process ships that are just sitting there waiting
+		globalThis.getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
+			let shipColor = Atomics.load(controller.color, Atomics.load(controlled.owner, eid));
+			let x = Atomics.load(position.x, eid);
+			let y = Atomics.load(position.y, eid);
+			let width = Atomics.load(position.width, eid);
+			let height = Atomics.load(position.height, eid);
 
 			// Try to find the nearest enemy
 			let rect = {
-				x: position.x[eid] - 50 * INT_FLOAT_MULTIPLIER,
-				y: position.y[eid] - 50 * INT_FLOAT_MULTIPLIER,
-				width: position.width[eid] + 100 * INT_FLOAT_MULTIPLIER,
-				height: position.height[eid] + 100 * INT_FLOAT_MULTIPLIER
+				x: x - 50 * 1_000,
+				y: y - 50 * 1_000,
+				width: width + 100 * 1_000,
+				height: height + 100 * 1_000
 			};
-			let enemies = getEnemiesInRange(quadtree, world, rect, eid, shipColor);
+			let enemies = getEnemiesInRange(quadtree, rect, eid, shipColor);
 			if(enemies.length === 0) {
-				rect.x -= 100 * INT_FLOAT_MULTIPLIER;
-				rect.y -= 100 * INT_FLOAT_MULTIPLIER;
-				rect.width += 200 * INT_FLOAT_MULTIPLIER;
-				rect.height += 200 * INT_FLOAT_MULTIPLIER;
-				enemies = getEnemiesInRange(quadtree, world, rect, eid, shipColor);
+				rect.x -= 100 * 1_000;
+				rect.y -= 100 * 1_000;
+				rect.width += 200 * 1_000;
+				rect.height += 200 * 1_000;
+				enemies = getEnemiesInRange(quadtree, rect, eid, shipColor);
 			}
 	
 			enemies.sort((a, b) => {
-				return euclideanDistance(position.x[a], position.y[a], position.x[eid], position.y[eid]) - euclideanDistance(position.x[b], position.y[b], position.x[eid], position.y[eid]);
+				return euclideanDistance(a.x, a.y, x, y) - euclideanDistance(b.x, b.y, x, y);
 			});
-			let enemy = enemies[0] ?? 0;
+			let enemy = enemies[0] ?? null;
 
 			// If no enemies that quadtree could easily find, just head for the nearest station
 			if(!enemy) {
-				let stations = getEntitiesWithComponents(world, ['controller']).filter(stationEid => controller.color[stationEid] !== shipColor && !world.components.entity.dead[stationEid]);
+				let stations = globalThis.getEntitiesWithComponents(world, ['controller']).filter(stationEid => Atomics.load(controller.color, stationEid) !== shipColor && !world.components.entity.dead[stationEid]);
 				stations.sort((a, b) => {
-					return euclideanDistance(position.x[a], position.y[a], position.x[eid], position.y[eid]) - euclideanDistance(position.x[b], position.y[b], position.x[eid], position.y[eid]);
+					return euclideanDistance(Atomics.load(position.x, a), Atomics.load(position.y, a), x, y) - euclideanDistance(Atomics.load(position.x, b), Atomics.load(position.y, b), x, y);
 				});
 
-				enemy = stations[0] ?? 0;
-			}
-
-			attack.target[eid] = enemy;
-
-			if(i % 10 === 0 && i > minCountToUpdate) {
-				// Check how long we have been running for
-				if(performance.now() - start > (delta / 2)) {
-					movingEntities = movingEntities.slice(i);
-					return;
+				if(stations.length) {
+					enemy = {
+						eid: stations[0],
+						x: 0,
+						y: 0,
+						width: 0,
+						height: 0
+					};
 				}
 			}
-		}
 
-		movingEntities = [];
+			if(enemy) {
+				Atomics.store(attack.target, eid, enemy.eid);
+			} else {
+				Atomics.store(attack.target, eid, 0);
+			}
+		});
 	};
+
+	function getEnemiesInRange(quadtree: any, range: { x: number, y: number, width: number, height: number }, eid: number, shipColor: number) : Array<QuadtreeData> {
+		let entitiesInRange = quadtree.retrieve(new globalThis.Rectangle(range)).map((result: any) => result.data) as Array<QuadtreeData>;
+		entitiesInRange = entitiesInRange.filter(data => data.eid !== eid);
+		return entitiesInRange.filter(data => {
+			// Ship
+			if(globalThis.hasComponent(world.components, data.eid, 'controlled')) {
+				let stationEid = Atomics.load(controlled.owner, data.eid);
+				return Atomics.load(controller.color, stationEid) !== shipColor;
+			}
+			// Station
+			else if(globalThis.hasComponent(world.components, data.eid, 'controller')) {
+				return Atomics.load(controller.color, data.eid) !== shipColor;
+			} else {
+				return false;
+			}
+		});
+	}
+
+	function euclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
+		return (x1 - x2) ** 2 + (y1 - y2) ** 2;
+	}
+
+	interface QuadtreeData {
+		eid: number;
+		x: number;
+		y: number;
+		width: number;
+		height: number
+	}
 }
 
-function getEnemiesInRange(quadtree: any, world: World, range: { x: number, y: number, width: number, height: number }, eid: number, shipColor: number) : Array<number> {
-	const controlled = world.components.controlled;
-	const controller = world.components.controller;
-
-	let entitiesInRange = quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data.eid).filter((otherEid: number) => otherEid !== eid);
-	return entitiesInRange.filter((otherEid: number) => {
-		// Ship
-		if(hasComponent(world.components, otherEid, 'controlled')) {
-			let stationEid = controlled.owner[otherEid];
-			return controller.color[stationEid] !== shipColor;
-		}
-		// Station
-		else if(hasComponent(world.components, otherEid, 'controller')) {
-			return controller.color[otherEid] !== shipColor;
-		} else {
-			return false;
-		}
-	});
+declare global {
+	// eslint-disable-next-line
+	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
+	// eslint-disable-next-line
+	var hasComponent: (components: Components, eid: number, type: string) => boolean;
+	// eslint-disable-next-line
+	var Quadtree: any;
+	// eslint-disable-next-line
+	var Rectangle: any;
+	// eslint-disable-next-line
+	var importScripts: any;
 }

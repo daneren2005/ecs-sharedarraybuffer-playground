@@ -24,6 +24,7 @@ export default class World extends EventEmitter {
 	} = { width: 0, height: 0 };
 	components = components;
 	systems: Array<(world: IWorld, delta: number) => IWorld> = [];
+	systemUpdates: { [s: string]: Array<number> } = {};
 
 	get entities() { return [...this.eidMap.values()]; }
 
@@ -31,13 +32,13 @@ export default class World extends EventEmitter {
 		super();
 		this.ecs = createWorld();
 
-		this.systems.push(createQuadTreeSystem(this));
-		this.systems.push(spawnShipSystem(this));
-		this.systems.push(targetEnemySystem(this));
-		this.systems.push(moveToTargetSystem(this));
-		this.systems.push(velocitySystem(this));
-		this.systems.push(collisionSystem(this));
-		this.systems.push(updateHealthTimersSystem(this));
+		this.addSystem('quadTreeSystem', createQuadTreeSystem(this));
+		this.addSystem('spawnShipSystem', spawnShipSystem(this));
+		this.addSystem('targetEnemySystem', targetEnemySystem(this));
+		this.addSystem('moveToTargetSystem', moveToTargetSystem(this));
+		this.addSystem('velocitySystem', velocitySystem(this));
+		this.addSystem('collisionSystem', collisionSystem(this));
+		this.addSystem('updateHealthTimersSystem', updateHealthTimersSystem(this));
 	}
 
 	load(config: any) {
@@ -75,5 +76,16 @@ export default class World extends EventEmitter {
 		this.systems.forEach(system => {
 			system(this.ecs, delta);
 		});
+	}
+
+	addSystem(name: string, update: (world: IWorld, delta: number) => void) {
+		this.systems.push((world: IWorld, delta: number) => {
+			let start = performance.now();
+			update(world, delta);
+			this.systemUpdates[name].push(performance.now() - start);
+
+			return world;
+		});
+		this.systemUpdates[name] = [];
 	}
 }

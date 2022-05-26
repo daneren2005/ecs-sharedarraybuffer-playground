@@ -1,6 +1,7 @@
 export default interface Components {
 	entity: {
 		components: Int32Array,
+		init: Int32Array,
 		dead: Int32Array
 	},
 	position: {

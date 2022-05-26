@@ -22,11 +22,15 @@ This is my first attempt to use an ECS system, and I think I tried to hard to co
 https://daneren2005.github.io/ecs-arraybuffer/#/bitecs
 
 ## Custom ECS backed by SharedArrayBuffers
-In this version, we have a quick and dirty ECS system where the components are hard coded and each SharedArrayBuffer is a large fixed length int array.  Each component is using SharedArrayBuffers and Atomics to load and update properties.  Each system runs in it's own thread.
+In this version, we have a quick and dirty ECS system where the components are hard coded and each SharedArrayBuffer is a large fixed length int array.  Each component is using SharedArrayBuffers and Atomics to load and update properties.  Each system runs in it's own thread.  All the main thread is doing every frame is looping through every entity and updating it's visual properties (ie: position, angle, etc...).  As a huge number of ships are added stuff starts to not work 100% correctly since some of the sub-systems take too long to process, but visually continue to hum along nicely.  That could probably be fixed by sharding the heavy systems into multiple threads.  For a proof of concept I think this is good enough.
 
+https://daneren2005.github.io/ecs-arraybuffer/#/multithreaded
 
-### Gotchas
+### Things that suck that I don't know how to solve
 * Atomics only supports integers - POC used / 1000 for 4 decimal places, but reduces how big the numbers can be and possibly isn't precise enough in some cases.  It also adds it's own mental and computational overhead and makes the code uglier.
-* Webpack sucks at bundling imports for workers - basically ended up having to include every function that we need in a system in a single file to get it to work.  This won't scale very well.
-* Entity ids aren't recycled so eventually simulation will crash due to exceeding the default buffer size.
-* Copied bitECS way of having a single entity id used in components even though not all entities use every component.  Going to end up with a lot of wasted memory.
+* Webpack sucks at bundling imports for workers.  Webpack claims you can include files with `new URL('./worker.js', import.meta.url)`, but that doesn't actually resolve any of the imports in that file, making it worthless.  Ended up having to include every function that we need in a system in a single file and manually include them in the service code string to get it to work.  This won't scale very well.
+
+### Things that suck about my implementation but can be solved
+* Entity ids aren't recycled so eventually simulation will crash due to exceeding the default buffer size.  Currently getting around this by just starting with a massive starting buffer.
+* I copied bitECS way of having a single entity id used in components even though not all entities use every component.  Going to end up with a lot of wasted memory.
+* Systems start to get behind as the number of entities go up.  This could be helped by sharding them into multiple threads.

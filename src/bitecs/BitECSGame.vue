@@ -1,15 +1,13 @@
 <template>
 	<div class="home">
 		<div class="list">
-			<div>Startup time: {{ startupTime.toFixed(2) }} ms</div>
-			<div>Update time: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
+			<div style="color: red">mainThread: {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
+			<div v-for="system in systemUpdates" :key="system.name">{{ system.name }}: {{ system.max.toFixed(2) }} ({{ system.avg.toFixed(2) }} avg) ms</div>
 			<p/>
 
 			<div>Entities: {{ stationsCount }} stations and {{ shipsCount }} ships</div>
-			<div v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</div>
-
-			<p/>
-			<button @click="addShips">Add Ships</button>
+			<span class="station-list" v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</span>
+			<div><button @click="addShips">Add Ships</button></div>
 		</div>
 
 		<div id="phaser-container-bitecs"/>
@@ -28,7 +26,6 @@ import { Changed, defineQuery } from 'bitecs';
 import components from './components';
 
 let world = new World();
-const startupTime = ref(0);
 const minUpdateTime = ref(0);
 const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
@@ -36,6 +33,7 @@ const stationsCount = ref(0);
 const shipsCount = ref(0);
 const stationShips = ref([]) as Ref<Array<{ eid: number, color: number, displayColor: string, ships: number }>>;
 const stationQuery = defineQuery([components.controller]);
+const systemUpdates = ref([]) as Ref<Array<{ name: string, min: number, avg: number, max: number }>>;
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -74,15 +72,12 @@ onMounted(() => {
 					eidSpriteMap.set(entity.eid, image);
 				});
 
-				let start = performance.now();
 				world.load(generateScene({
 					stations: 6,
 					shipsPerStation: 100,
 					width,
 					height
 				}));
-				let end = performance.now();
-				startupTime.value = end - start;
 
 				let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
 				stationShips.value = stations.map(station => {
@@ -101,6 +96,15 @@ onMounted(() => {
 
 				this.input.keyboard.on('keydown-SPACE', () => {
 					paused = !paused;
+				});
+
+				Object.keys(world.systemUpdates).forEach(systemName => {
+					systemUpdates.value.push({
+						name: systemName,
+						min:0,
+						avg: 0,
+						max: 0
+					});
 				});
 			},
 			update(time: number, delta: number) {
@@ -165,6 +169,26 @@ onMounted(() => {
 							val.ships = 0;
 						}
 					});
+
+					systemUpdates.value = [];
+					Object.keys(world.systemUpdates).forEach(systemName => {
+						let updates = world.systemUpdates[systemName];
+
+						systemUpdates.value.push({
+							name: systemName,
+							min: updates.reduce((min, time) => {
+								return Math.min(min, time);
+							}, 1_000_000),
+							avg: updates.reduce((total, time) => {
+								return total + time;
+							}, 0) / updates.length,
+							max: updates.reduce((max, time) => {
+								return Math.max(max, time);
+							}, 0)
+						});
+
+						world.systemUpdates[systemName] = [];
+					});
 				}
 			}
 		}
@@ -187,5 +211,8 @@ function addShips() {
 <style scoped>
 .list {
 	margin-bottom: 1em;
+}
+.station-list {
+	margin-left: 0.5em;
 }
 </style>

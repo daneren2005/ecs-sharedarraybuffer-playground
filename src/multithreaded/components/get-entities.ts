@@ -63,3 +63,6 @@ export function getTypeBits(types: Array<string>): number {
 export function hasComponent(components: Components, eid: number, type: string) {
 	return (Atomics.load(components.entity.components, eid) & getTypeBit(type)) > 0;
 }
+export function addComponents(components: Components, eid: number, types: Array<string>) {
+	Atomics.or(components.entity.components, eid, getTypeBits(types));
+}

@@ -1,15 +1,13 @@
 <template>
 	<div class="home">
 		<div class="list">
-			<div>Startup time: {{ startupTime.toFixed(2) }} ms</div>
-			<div>Update time: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
+			<div style="color: red">mainThread: {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
+			<div v-for="system in systemUpdates" :key="system.name">{{ system.name }}: {{ system.max.toFixed(2) }} ({{ system.avg.toFixed(2) }} avg) ms</div>
 			<p/>
 
 			<div>Entities: {{ stationsCount }} stations and {{ shipsCount }} ships</div>
-			<div v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</div>
-
-			<p/>
-			<button @click="addShips">Add Ships</button>
+			<span class="station-list" v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</span>
+			<div><button @click="addShips">Add Ships</button></div>
 		</div>
 
 		<div id="phaser-container-multithreaded"/>
@@ -21,20 +19,18 @@ import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
 import World from './entities/world';
-import Entity from './entities/entity';
 import Station from './entities/station';
-import Ship from './entities/ship';
 import { INT_FLOAT_MULTIPLIER } from './constants';
-import { getAllEntitiesWithComponents, getEntitiesWithComponents } from './components/get-entities';
+import { getAllEntitiesWithComponents, getEntitiesWithComponents, hasComponent } from './components/get-entities';
 
 let world = new World();
-const startupTime = ref(0);
 const minUpdateTime = ref(0);
 const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
 const stationsCount = ref(0);
 const shipsCount = ref(0);
 const stationShips = ref([]) as Ref<Array<{ eid: number, color: number, displayColor: string, ships: number }>>;
+const systemUpdates = ref([]) as Ref<Array<{ name: string, min: number, avg: number, max: number }>>;
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -45,6 +41,7 @@ onMounted(() => {
 	const height = window.innerHeight / 3 * 2;
 	let paused = false;
 	const eidSpriteMap = new Map<number, any>();
+	let add: any;
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
 		width,
@@ -58,29 +55,13 @@ onMounted(() => {
 				this.load.image('shield', 'shield3.png');
 			},
 			create() {
-				// TODO: Be able to see added entities from outside threads
-				// TODO: We also need to be able to see entire load done BEFORE adding to display
-				world.on('entity-added', (entity: Entity) => {
-					let image = this.add.image(entity.x / INT_FLOAT_MULTIPLIER, entity.y / INT_FLOAT_MULTIPLIER, entity.key) as any;
-					image.setScale(entity.width / image.width / INT_FLOAT_MULTIPLIER, entity.height / image.height / INT_FLOAT_MULTIPLIER);
-					image.shieldImage = this.add.image(entity.x / INT_FLOAT_MULTIPLIER, entity.y / INT_FLOAT_MULTIPLIER, 'shield');
-					image.shieldImage.setScale(entity.width / image.shieldImage.width / INT_FLOAT_MULTIPLIER * 2, entity.height / image.shieldImage.height / INT_FLOAT_MULTIPLIER * 2);
-					image.shieldImage.visible = entity.shields > 0;
-					if(entity instanceof Station || entity instanceof Ship) {
-						image.setTint(entity.color);
-					}
-					eidSpriteMap.set(entity.eid, image);
-				});
-
-				let start = performance.now();
+				add = this.add;
 				world.load(generateScene({
 					stations: 10,
 					shipsPerStation: 100,
 					width,
 					height
 				}));
-				let end = performance.now();
-				startupTime.value = end - start;
 
 				let stations = getEntitiesWithComponents(world, ['controller']);
 				stationShips.value = stations.map(eid => {
@@ -101,6 +82,15 @@ onMounted(() => {
 				this.input.keyboard.on('keydown-SPACE', () => {
 					paused = !paused;
 				});
+
+				Object.keys(world.systemUpdates).forEach(systemName => {
+					systemUpdates.value.push({
+						name: systemName,
+						min:0,
+						avg: 0,
+						max: 0
+					});
+				});
 			},
 			update(time: number, delta: number) {
 				if(paused) {
@@ -110,21 +100,41 @@ onMounted(() => {
 				let start = performance.now();
 				world.update(delta);
 
+				let position = world.components.position;
 				getAllEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
 					let image = eidSpriteMap.get(eid);
-					if(!image) {
-						return;
-					}
-
-					image.x = image.shieldImage.x = (world.components.position.x[eid] / INT_FLOAT_MULTIPLIER);
-					image.y = image.shieldImage.y = (world.components.position.y[eid] / INT_FLOAT_MULTIPLIER);
-					image.angle = image.shieldImage.angle = world.components.position.angle[eid];
-					
-					image.shieldImage.visible = world.components.health.shields[eid] > 0;
 					if(world.components.entity.dead[eid]) {
-						image.destroy();
-						image.shieldImage.destroy();
-						eidSpriteMap.delete(eid);
+						if(image) {
+							image.destroy();
+							image.shieldImage.destroy();
+							eidSpriteMap.delete(eid);
+						}
+					} else {
+						if(!image) {
+							if(Atomics.load(world.components.entity.init, eid) === 0) {
+								return;
+							}
+
+							image = add.image(0, 0, hasComponent(world.components, eid, 'controller') ? 'station' : 'boid');
+
+							image.setScale(position.width[eid] / image.width / INT_FLOAT_MULTIPLIER, position.height[eid] / image.height / INT_FLOAT_MULTIPLIER);
+							image.shieldImage = add.image(0, 0, 'shield');
+							image.shieldImage.setScale(position.width[eid] / image.shieldImage.width / INT_FLOAT_MULTIPLIER * 2,position.height[eid] / image.shieldImage.height / INT_FLOAT_MULTIPLIER * 2);
+
+							if(hasComponent(world.components, eid, 'controller')) {
+								image.setTint(Atomics.load(world.components.controller.color, eid));
+							} else if(hasComponent(world.components, eid, 'controlled')) {
+								let stationEid = Atomics.load(world.components.controlled.owner, eid);
+								image.setTint(Atomics.load(world.components.controller.color, stationEid));
+							}
+							eidSpriteMap.set(eid, image);
+						}
+
+						image.x = image.shieldImage.x = (world.components.position.x[eid] / INT_FLOAT_MULTIPLIER);
+						image.y = image.shieldImage.y = (world.components.position.y[eid] / INT_FLOAT_MULTIPLIER);
+						image.angle = image.shieldImage.angle = world.components.position.angle[eid];
+						
+						image.shieldImage.visible = world.components.health.shields[eid] > 0;
 					}
 				});
 				let end = performance.now();
@@ -158,6 +168,26 @@ onMounted(() => {
 							val.ships = 0;
 						}
 					});
+
+					systemUpdates.value = [];
+					Object.keys(world.systemUpdates).forEach(systemName => {
+						let updates = world.systemUpdates[systemName];
+
+						systemUpdates.value.push({
+							name: systemName,
+							min: updates.reduce((min, time) => {
+								return Math.min(min, time);
+							}, 1_000_000),
+							avg: updates.reduce((total, time) => {
+								return total + time;
+							}, 0) / updates.length,
+							max: updates.reduce((max, time) => {
+								return Math.max(max, time);
+							}, 0)
+						});
+
+						world.systemUpdates[systemName] = [];
+					});
 				}
 			}
 		}
@@ -167,7 +197,10 @@ onBeforeUnmount(() => {
 	if(game) {
 		game.destroy();
 		game = null;
-	} 
+	}
+	if(world) {
+		world.destroy();
+	}
 });
 
 function addShips() {
@@ -180,5 +213,8 @@ function addShips() {
 <style scoped>
 .list {
 	margin-bottom: 1em;
+}
+.station-list {
+	margin-left: 0.5em;
 }
 </style>

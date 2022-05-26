@@ -58,8 +58,4 @@ export default class Entity extends EventEmitter {
 			}
 		});
 	}
-
-	addComponents(types: Array<string>) {
-		Atomics.or(this.world.components.entity.components, this.eid, getTypeBits(types));
-	}
 }

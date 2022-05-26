@@ -1,9 +1,9 @@
 import { getEntitiesWithComponents } from '../components/get-entities';
-import World from '../entities/world';
+import WorldConfig from '../entities/world-config';
 
 globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
 
-export default function velocitySystem(world: World) {
+export default function velocitySystem(world: WorldConfig) {
 	const position = world.components.position;
 	const velocity = world.components.velocity;
 

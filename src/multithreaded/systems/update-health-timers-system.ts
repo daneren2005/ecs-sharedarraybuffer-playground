@@ -1,21 +1,27 @@
 import { getEntitiesWithComponents } from '../components/get-entities';
-import { INT_FLOAT_MULTIPLIER } from '../constants';
-import World from '../entities/world';
+import WorldConfig from '../entities/world-config';
 
-export default function updateHealthTimersSystem(world: World) {
+globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
+
+export default function updateHealthTimersSystem(world: WorldConfig) {
 	const health = world.components.health;
 
 	return (delta: number) => {
-		getEntitiesWithComponents(world, ['health']).forEach(eid => {
-			Atomics.add(health.timeSinceTakenDamage, eid, delta * INT_FLOAT_MULTIPLIER);
+		globalThis.getEntitiesWithComponents(world, ['health']).forEach(eid => {
+			Atomics.add(health.timeSinceTakenDamage, eid, delta * 1_000);
 
-			if(health.shields[eid] < health.maxShields[eid]) {
-				Atomics.add(health.timeSinceShieldRegeneration, eid, delta * INT_FLOAT_MULTIPLIER);
-				if(health.timeSinceShieldRegeneration[eid] > health.timeToRegenerateShields[eid]) {
+			if(Atomics.load(health.shields, eid) < Atomics.load(health.maxShields, eid)) {
+				Atomics.add(health.timeSinceShieldRegeneration, eid, delta * 1_000);
+				if(Atomics.load(health.timeSinceShieldRegeneration, eid) > Atomics.load(health.timeToRegenerateShields, eid)) {
 					Atomics.add(health.shields, eid, 1);
 					Atomics.store(health.timeSinceShieldRegeneration, eid, 0);
 				}
 			}
 		});
 	};
+}
+
+declare global {
+	// eslint-disable-next-line
+	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
 }
