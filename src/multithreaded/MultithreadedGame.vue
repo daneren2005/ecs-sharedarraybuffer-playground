@@ -1,5 +1,5 @@
 <template>
-	<div class="home">
+	<div class="home" v-if="supportsSharedArrayBuffers">
 		<div class="list">
 			<div style="color: red">mainThread: {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
 			<div v-for="system in systemUpdates" :key="system.name">{{ system.name }}: {{ system.max.toFixed(2) }} ({{ system.avg.toFixed(2) }} avg) ms</div>
@@ -12,6 +12,9 @@
 
 		<div id="phaser-container-multithreaded"/>
 	</div>
+	<div v-else>
+		Browser does not suport SharedArrayBuffer
+	</div>
 </template>
 
 <script setup lang="ts">
@@ -22,7 +25,9 @@ import World from './entities/world';
 import { INT_FLOAT_MULTIPLIER } from './constants';
 import { getAllEntitiesWithComponents, getEntitiesWithComponents, hasComponent } from './components/get-entities';
 
-let world = new World();
+const supportsSharedArrayBuffers = !!window.SharedArrayBuffer;
+
+let world: World;
 const minUpdateTime = ref(0);
 const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
@@ -33,6 +38,7 @@ const systemUpdates = ref([]) as Ref<Array<{ name: string, min: number, avg: num
 
 let game: Phaser.Game | null;
 onMounted(() => {
+	world = new World();
 	let updateTicks = 0;
 	let updateTimes: Array<number> = [];
 
