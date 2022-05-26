@@ -131,6 +131,7 @@ export default class World extends EventEmitter {
 			${
 				(() => {
 					let world: any;
+					// eslint-disable-next-line
 					let system = (delta: number) => { console.warn('Updating system before sent'); };
 
 					self.onmessage = function(e) {

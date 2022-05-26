@@ -1,4 +1,4 @@
-export default interface Components {
+interface Components {
 	entity: {
 		components: Int32Array,
 		init: Int32Array,
@@ -34,3 +34,5 @@ export default interface Components {
 		target: Int32Array
 	}
 }
+
+export default Components;

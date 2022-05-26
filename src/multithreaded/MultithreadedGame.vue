@@ -19,7 +19,6 @@ import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
 import World from './entities/world';
-import Station from './entities/station';
 import { INT_FLOAT_MULTIPLIER } from './constants';
 import { getAllEntitiesWithComponents, getEntitiesWithComponents, hasComponent } from './components/get-entities';
 

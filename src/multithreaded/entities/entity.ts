@@ -1,5 +1,4 @@
 import { EventEmitter } from 'eventemitter3';
-import { getTypeBits } from '../components/get-entities';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
 import World from './world';
 

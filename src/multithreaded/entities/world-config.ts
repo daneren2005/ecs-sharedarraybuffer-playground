@@ -1,6 +1,6 @@
 import Components from '../components/components';
 
-export default interface WorldConfig {
+interface WorldConfig {
 	bounds: {
 		width: number,
 		height: number
@@ -8,3 +8,5 @@ export default interface WorldConfig {
 	idCounter: Int32Array;
 	components: Components;
 }
+
+export default WorldConfig;

@@ -1,7 +1,5 @@
-import Components from '../components/components';
 import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
-const PhaserMath = require('phaser/src/math');
 
 globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
 
