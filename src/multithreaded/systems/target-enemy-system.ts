@@ -1,12 +1,8 @@
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
-import { getEntitiesWithComponents, hasComponent } from '../components/get-entities';
-import Components from '../components/components';
+import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
-
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
-globalThis.hasComponent = hasComponent;
-globalThis.Quadtree = Quadtree;
-globalThis.Rectangle = Rectangle;
+import euclideanDistance from '@/math/euclidean-distance';
+import hasComponent from '../components/has-component';
 
 export default function targetEnemySystem(world: WorldConfig) {
 	const position = world.components.position;
@@ -14,18 +10,13 @@ export default function targetEnemySystem(world: WorldConfig) {
 	const controller = world.components.controller;
 	const attack = world.components.attack;
 
-	if(globalThis.importScripts) {
-		globalThis.importScripts('https://cdn.jsdelivr.net/npm/@timohausmann/quadtree-ts/dist/quadtree.umd.full.js');
-		globalThis.Rectangle = globalThis.Quadtree.Rectangle;
-	}
-
 	return () => {
 		// Create and populate quadtree
-		let quadtree = new globalThis.Quadtree({
+		let quadtree = new Quadtree({
 			width: world.bounds.width * 1_000,
 			height: world.bounds.height * 1_000
 		});
-		globalThis.getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
+		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
 			let data = {
 				x: Atomics.load(position.x, eid),
 				y: Atomics.load(position.y, eid),
@@ -33,7 +24,7 @@ export default function targetEnemySystem(world: WorldConfig) {
 				height: Atomics.load(position.height, eid)
 			};
 
-			quadtree.insert(new globalThis.Rectangle({
+			quadtree.insert(new Rectangle({
 				...data,
 				data: {
 					eid,
@@ -43,7 +34,7 @@ export default function targetEnemySystem(world: WorldConfig) {
 		});
 
 		// TODO: Don't wait a full 200ms to process ships that are just sitting there waiting
-		globalThis.getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
+		getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
 			let shipColor = Atomics.load(controller.color, Atomics.load(controlled.owner, eid));
 			let x = Atomics.load(position.x, eid);
 			let y = Atomics.load(position.y, eid);
@@ -73,7 +64,7 @@ export default function targetEnemySystem(world: WorldConfig) {
 
 			// If no enemies that quadtree could easily find, just head for the nearest station
 			if(!enemy) {
-				let stations = globalThis.getEntitiesWithComponents(world, ['controller']).filter(stationEid => Atomics.load(controller.color, stationEid) !== shipColor && !world.components.entity.dead[stationEid]);
+				let stations = getEntitiesWithComponents(world, ['controller']).filter(stationEid => Atomics.load(controller.color, stationEid) !== shipColor && !world.components.entity.dead[stationEid]);
 				stations.sort((a, b) => {
 					return euclideanDistance(Atomics.load(position.x, a), Atomics.load(position.y, a), x, y) - euclideanDistance(Atomics.load(position.x, b), Atomics.load(position.y, b), x, y);
 				});
@@ -98,25 +89,21 @@ export default function targetEnemySystem(world: WorldConfig) {
 	};
 
 	function getEnemiesInRange(quadtree: any, range: { x: number, y: number, width: number, height: number }, eid: number, shipColor: number) : Array<QuadtreeData> {
-		let entitiesInRange = quadtree.retrieve(new globalThis.Rectangle(range)).map((result: any) => result.data) as Array<QuadtreeData>;
+		let entitiesInRange = quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data) as Array<QuadtreeData>;
 		entitiesInRange = entitiesInRange.filter(data => data.eid !== eid);
 		return entitiesInRange.filter(data => {
 			// Ship
-			if(globalThis.hasComponent(world.components, data.eid, 'controlled')) {
+			if(hasComponent(world.components, data.eid, 'controlled')) {
 				let stationEid = Atomics.load(controlled.owner, data.eid);
 				return Atomics.load(controller.color, stationEid) !== shipColor;
 			}
 			// Station
-			else if(globalThis.hasComponent(world.components, data.eid, 'controller')) {
+			else if(hasComponent(world.components, data.eid, 'controller')) {
 				return Atomics.load(controller.color, data.eid) !== shipColor;
 			} else {
 				return false;
 			}
 		});
-	}
-
-	function euclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
-		return (x1 - x2) ** 2 + (y1 - y2) ** 2;
 	}
 
 	interface QuadtreeData {
@@ -126,17 +113,4 @@ export default function targetEnemySystem(world: WorldConfig) {
 		width: number;
 		height: number
 	}
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
-	// eslint-disable-next-line
-	var hasComponent: (components: Components, eid: number, type: string) => boolean;
-	// eslint-disable-next-line
-	var Quadtree: any;
-	// eslint-disable-next-line
-	var Rectangle: any;
-	// eslint-disable-next-line
-	var importScripts: any;
 }

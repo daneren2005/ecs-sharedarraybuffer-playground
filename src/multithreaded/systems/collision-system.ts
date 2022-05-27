@@ -1,12 +1,9 @@
+import computeAngle from '@/math/compute-angle';
+import distance from '@/math/distance';
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
-import { getEntitiesWithComponents, hasComponent } from '../components/get-entities';
-import Components from '../components/components';
+import { getEntitiesWithComponents } from '../components/get-entities';
+import hasComponent from '../components/has-component';
 import WorldConfig from '../entities/world-config';
-
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
-globalThis.hasComponent = hasComponent;
-globalThis.Quadtree = Quadtree;
-globalThis.Rectangle = Rectangle;
 
 export default function collisionSystem(world: WorldConfig) {
 	const position = world.components.position;
@@ -14,19 +11,14 @@ export default function collisionSystem(world: WorldConfig) {
 	const controlled = world.components.controlled;
 	const controller = world.components.controller;
 
-	if(globalThis.importScripts) {
-		globalThis.importScripts('https://cdn.jsdelivr.net/npm/@timohausmann/quadtree-ts/dist/quadtree.umd.full.js');
-		globalThis.Rectangle = globalThis.Quadtree.Rectangle;
-	}
-
 	return () => {
 		// Create and populate quadtree
-		let quadtree = new globalThis.Quadtree({
+		let quadtree = new Quadtree({
 			width: world.bounds.width * 1_000,
 			height: world.bounds.height * 1_000
 		});
-		globalThis.getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
-			quadtree.insert(new globalThis.Rectangle({
+		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
+			quadtree.insert(new Rectangle({
 				x: Atomics.load(position.x, eid),
 				y: Atomics.load(position.y, eid),
 				width: Atomics.load(position.width, eid),
@@ -38,9 +30,9 @@ export default function collisionSystem(world: WorldConfig) {
 		});
 
 		// Use quadtree to see who we are colliding with
-		let ships = globalThis.getEntitiesWithComponents(world, ['velocity']);
+		let ships = getEntitiesWithComponents(world, ['velocity']);
 		ships.forEach(eid => {
-			let entitiesInRange = quadtree.retrieve(new globalThis.Rectangle({
+			let entitiesInRange = quadtree.retrieve(new Rectangle({
 				x: position.x[eid],
 				y: position.y[eid],
 				width: position.width[eid],
@@ -49,12 +41,12 @@ export default function collisionSystem(world: WorldConfig) {
 			let shipColor = controller.color[controlled.owner[eid]];
 			let enemiesInRange = entitiesInRange.filter((otherEid: number) => {
 				// Ship
-				if(globalThis.hasComponent(world.components, otherEid, 'controlled')) {
+				if(hasComponent(world.components, otherEid, 'controlled')) {
 					let stationEid = controlled.owner[otherEid];
 					return controller.color[stationEid] !== shipColor;
 				}
 				// Station
-				else if(globalThis.hasComponent(world.components, otherEid, 'controller')) {
+				else if(hasComponent(world.components, otherEid, 'controller')) {
 					return controller.color[otherEid] !== shipColor;
 				} else {
 					return false;
@@ -71,17 +63,13 @@ export default function collisionSystem(world: WorldConfig) {
 		});
 	};
 
-	function distance(x1: number, y1: number, x2: number, y2: number): number {
-		return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-	}
-
 	function collide(ships: Array<number>, eid: number, target: number) {
 		if(!canTakeDamage(eid) || !canTakeDamage(target)) {
 			return;
 		}
 	
 		let enemyWorth = 1;
-		if(globalThis.hasComponent(world.components, target, 'controller')) {
+		if(hasComponent(world.components, target, 'controller')) {
 			enemyWorth = ships.filter(eid => world.components.controlled.owner[eid] === target).length;
 		}
 	
@@ -95,12 +83,12 @@ export default function collisionSystem(world: WorldConfig) {
 		}
 		if(world.components.entity.dead[eid]) {
 			// Ship
-			if(globalThis.hasComponent(world.components, target, 'controlled')) {
+			if(hasComponent(world.components, target, 'controlled')) {
 				let stationEid = controlled.owner[target];
 				world.components.controller.money[stationEid] += 1;
 			}
 			// Station
-			else if(globalThis.hasComponent(world.components, target, 'controller')) {
+			else if(hasComponent(world.components, target, 'controller')) {
 				world.components.controller.money[target] += 1;
 			}
 		}
@@ -112,7 +100,7 @@ export default function collisionSystem(world: WorldConfig) {
 		if(health.shields[eid] < 0) {
 			world.components.entity.dead[eid] = 1;
 	
-			if(globalThis.hasComponent(world.components, eid, 'controller')) {
+			if(hasComponent(world.components, eid, 'controller')) {
 				let controlledShips = ships.filter(shipEid => world.components.controlled.owner[shipEid] === eid);
 				controlledShips.forEach(shipEid => {
 					world.components.entity.dead[shipEid] = 1;
@@ -124,22 +112,4 @@ export default function collisionSystem(world: WorldConfig) {
 	function canTakeDamage(eid: number) {
 		return Atomics.load(world.components.health.timeSinceTakenDamage, eid) >= 200 * 1_000;
 	}
-
-	function computeAngle(x: number, y: number) {
-		let radians = Math.atan2(y, x);
-		return radians * (180 / Math.PI);
-	}
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
-	// eslint-disable-next-line
-	var hasComponent: (components: Components, eid: number, type: string) => boolean;
-	// eslint-disable-next-line
-	var Quadtree: any;
-	// eslint-disable-next-line
-	var Rectangle: any;
-	// eslint-disable-next-line
-	var importScripts: any;
 }

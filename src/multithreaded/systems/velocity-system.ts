@@ -1,14 +1,13 @@
+import computeAngle from '@/math/compute-angle';
 import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
-
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
 
 export default function velocitySystem(world: WorldConfig) {
 	const position = world.components.position;
 	const velocity = world.components.velocity;
 
 	return (delta: number) => {
-		let ships = globalThis.getEntitiesWithComponents(world, ['position', 'velocity']);
+		let ships = getEntitiesWithComponents(world, ['position', 'velocity']);
 		ships.forEach(shipEid => {
 			let velocityX = Atomics.load(velocity.x, shipEid);
 			let velocityY = Atomics.load(velocity.y, shipEid);
@@ -28,14 +27,4 @@ export default function velocitySystem(world: WorldConfig) {
 			}
 		});
 	};
-
-	function computeAngle(x: number, y: number) {
-		let radians = Math.atan2(y, x);
-		return radians * (180 / Math.PI);
-	}
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
 }

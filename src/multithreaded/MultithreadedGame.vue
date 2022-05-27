@@ -23,7 +23,8 @@ import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
 import World from './entities/world';
 import { INT_FLOAT_MULTIPLIER } from './constants';
-import { getAllEntitiesWithComponents, getEntitiesWithComponents, hasComponent } from './components/get-entities';
+import { getAllEntitiesWithComponents, getEntitiesWithComponents } from './components/get-entities';
+import hasComponent from './components/has-component';
 
 const supportsSharedArrayBuffers = !!window.SharedArrayBuffer;
 

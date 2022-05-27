@@ -28,7 +28,6 @@ https://daneren2005.github.io/ecs-arraybuffer/#/multithreaded
 
 ### Things that suck that I don't know how to solve
 * Atomics only supports integers - POC used / 1000 for 4 decimal places, but reduces how big the numbers can be and possibly isn't precise enough in some cases.  It also adds it's own mental and computational overhead and makes the code uglier.
-* Webpack sucks at bundling imports for workers.  Webpack claims you can include files with `new URL('./worker.js', import.meta.url)`, but that doesn't actually resolve any of the imports in that file, making it worthless.  Ended up having to include every function that we need in a system in a single file and manually include them in the service code string to get it to work.  This won't scale very well.
 
 ### Things that suck about my implementation but can be solved
 * Entity ids aren't recycled so eventually simulation will crash due to exceeding the default buffer size.  Currently getting around this by just starting with a massive starting buffer.

@@ -1,9 +1,7 @@
-import Components from '../components/components';
-import { addComponents, getEntitiesWithComponents } from '../components/get-entities';
+import computeAngle from '@/math/compute-angle';
+import addComponents from '../components/add-component';
+import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
-
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
-globalThis.addComponents = addComponents;
 
 export default function spawnShipSystem(world: WorldConfig) {
 	const controller = world.components.controller;
@@ -14,10 +12,10 @@ export default function spawnShipSystem(world: WorldConfig) {
 
 	return () => {
 		const SHIP_SPEED = 100;
-		globalThis.getEntitiesWithComponents(world, ['controller']).forEach(stationEid => {
+		getEntitiesWithComponents(world, ['controller']).forEach(stationEid => {
 			if(controller.money[stationEid] > 0) {
 				let shipEid = Atomics.add(world.idCounter, 0, 1) + 1;
-				globalThis.addComponents(world.components, shipEid, ['entity', 'position', 'health', 'velocity', 'controlled', 'attack']);
+				addComponents(world.components, shipEid, ['entity', 'position', 'health', 'velocity', 'controlled', 'attack']);
 
 				Atomics.store(position.width, shipEid, 10 * 1_000);
 				Atomics.store(position.height, shipEid, 5 * 1_000);
@@ -40,16 +38,4 @@ export default function spawnShipSystem(world: WorldConfig) {
 			}
 		});
 	};
-
-	function computeAngle(x: number, y: number) {
-		let radians = Math.atan2(y, x);
-		return radians * (180 / Math.PI);
-	}
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
-	// eslint-disable-next-line
-	var addComponents: (components: Components, eid: number, types: Array<string>) => void;
 }

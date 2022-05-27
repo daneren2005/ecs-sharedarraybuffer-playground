@@ -1,4 +1,4 @@
-import { addComponents } from '../components/get-entities';
+import addComponents from '../components/add-component';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
 import Entity from './entity';
 import World from './world';

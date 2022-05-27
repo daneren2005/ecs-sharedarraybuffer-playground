@@ -1,13 +1,11 @@
 import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
 
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
-
 export default function updateHealthTimersSystem(world: WorldConfig) {
 	const health = world.components.health;
 
 	return (delta: number) => {
-		globalThis.getEntitiesWithComponents(world, ['health']).forEach(eid => {
+		getEntitiesWithComponents(world, ['health']).forEach(eid => {
 			Atomics.add(health.timeSinceTakenDamage, eid, delta * 1_000);
 
 			if(Atomics.load(health.shields, eid) < Atomics.load(health.maxShields, eid)) {
@@ -19,9 +17,4 @@ export default function updateHealthTimersSystem(world: WorldConfig) {
 			}
 		});
 	};
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
 }

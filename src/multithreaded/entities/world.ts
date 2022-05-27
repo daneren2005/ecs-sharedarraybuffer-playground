@@ -1,15 +1,8 @@
 import Entity from './entity';
 import { EventEmitter } from 'eventemitter3';
 import Station from './station';
-import spawnShipSystem from '../systems/spawn-ship-system';
-import velocitySystem from '../systems/velocity-system';
-import collisionSystem from '../systems/collision-system';
-import updateHealthTimersSystem from '../systems/update-health-timers-system';
-import moveToTargetSystem from '../systems/move-to-target-system';
-import targetEnemySystem from '../systems/target-enemy-system';
 import Components from '../components/components';
 import WorldConfig from './world-config';
-import { getEntitiesWithComponents, getTypeBit, getTypeBits, hasComponent, addComponents } from '../components/get-entities';
 
 export default class World extends EventEmitter {
 	bounds: {
@@ -63,14 +56,14 @@ export default class World extends EventEmitter {
 			}
 		};
 
-		this.addSystemWorker(spawnShipSystem);
-		this.addSystemWorker(velocitySystem);
+		this.addSystemWorker('spawnShipSystem', new Worker(new URL('../systems/spawn-ship-worker', import.meta.url)));
+		this.addSystemWorker('velocitySystem', new Worker(new URL('../systems/velocity-worker', import.meta.url)));
 		// TODO: Shard into 2 collision threads
-		this.addSystemWorker(collisionSystem);
-		this.addSystemWorker(updateHealthTimersSystem);
+		this.addSystemWorker('collisionSystem', new Worker(new URL('../systems/collision-worker', import.meta.url)));
+		this.addSystemWorker('updateHealthTimersSystem', new Worker(new URL('../systems/update-health-timers-worker', import.meta.url)));
 		// TODO: Shard into 2-4 targeting threads
-		this.addSystemWorker(targetEnemySystem);
-		this.addSystemWorker(moveToTargetSystem);
+		this.addSystemWorker('targetEnemySystem', new Worker(new URL('../systems/target-enemy-worker', import.meta.url)));
+		this.addSystemWorker('moveToTargetSystem', new Worker(new URL('../systems/move-to-target-worker', import.meta.url)));
 	}
 	// TODO: Resize buffers as we grow in size and recycle dead ids instead of requiring such a ridiculously huge buffer
 	private createIntegerArray(size = 65_536) {
@@ -123,50 +116,9 @@ export default class World extends EventEmitter {
 		});
 		this.systemUpdates[name] = [];
 	}
-	addSystemWorker(func: any) {
-		let functionName = func.name;
-		let inlineString = `
-
-		(
-			${
-				(() => {
-					let world: any;
-					// eslint-disable-next-line
-					let system = (delta: number) => { console.warn('Updating system before sent'); };
-
-					self.onmessage = function(e) {
-						if(e.data.world) {
-							let functionName = e.data.functionName;
-							world = e.data.world;
-							// @ts-expect-error
-							system = self[functionName](world);
-						} else if(e.data.updateWorld) {
-							Object.keys(e.data.updateWorld).forEach(key => {
-								world[key] = e.data.updateWorld[key];
-							});
-						} else if(e.data.delta) {
-							system(e.data.delta);
-
-							self.postMessage({
-								done: true
-							});
-						}
-					};
-				}).toString()
-			}
-		)()
-
-		${func.toString()}
-		${getEntitiesWithComponents.toString()}
-		${getTypeBit.toString()}
-		${getTypeBits.toString()}
-		${hasComponent.toString()}
-		${addComponents.toString()}`;
-
+	addSystemWorker(functionName: string, worker: Worker) {
 		let start = 0;
 		let missedDeltas = 0;
-		let blob = new Blob([inlineString], { type: 'text/javascript' });
-		let worker = new Worker(window.URL.createObjectURL(blob));
 		this.systems.push((delta) => {
 			// We don't want to try to update while it is still executing the last update
 			if(start) {
@@ -180,14 +132,13 @@ export default class World extends EventEmitter {
 			});
 			missedDeltas = 0;
 		});
+		this.systemUpdates[functionName] = [];
 
 		let config: WorldConfig = {
 			idCounter: this.idCounter,
 			bounds: this.bounds,
 			components: this.components
 		};
-		this.systemUpdates[functionName] = [];
-
 		worker.postMessage({
 			functionName,
 			world: config

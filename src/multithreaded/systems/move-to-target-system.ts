@@ -1,7 +1,6 @@
+import computeAngle from '@/math/compute-angle';
 import { getEntitiesWithComponents } from '../components/get-entities';
 import WorldConfig from '../entities/world-config';
-
-globalThis.getEntitiesWithComponents = getEntitiesWithComponents;
 
 export default function moveToTargetSystem(world: WorldConfig) {
 	const position = world.components.position;
@@ -9,7 +8,7 @@ export default function moveToTargetSystem(world: WorldConfig) {
 	const attack = world.components.attack;
 
 	return () => {
-		globalThis.getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
+		getEntitiesWithComponents(world, ['velocity', 'attack']).forEach(eid => {
 			let target = attack.target[eid];
 			if(!target || world.components.entity.dead[target]) {
 				return;
@@ -32,11 +31,6 @@ export default function moveToTargetSystem(world: WorldConfig) {
 		return normalize(Atomics.load(position.x, otherEid) - Atomics.load(position.x, eid), Atomics.load(position.y, otherEid) - Atomics.load(position.y, eid));
 	}
 
-	function computeAngle(x: number, y: number) {
-		let radians = Math.atan2(y, x);
-		return radians * (180 / Math.PI);
-	}
-
 	function normalize(x: number, y: number) {
 		let len = x * x + y * y;
 		if(len > 0) {
@@ -53,9 +47,4 @@ export default function moveToTargetSystem(world: WorldConfig) {
 			};
 		}
 	}
-}
-
-declare global {
-	// eslint-disable-next-line
-	var getEntitiesWithComponents: (world: any, types: Array<string>) => Array<number>;
 }
