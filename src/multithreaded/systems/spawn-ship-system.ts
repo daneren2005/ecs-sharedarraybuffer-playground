@@ -1,6 +1,7 @@
 import computeAngle from '@/math/compute-angle';
 import addComponents from '../components/add-component';
-import { getEntitiesWithComponents } from '../components/get-entities';
+import { createEntity } from '../entities/create-entity';
+import { getEntitiesWithComponents } from '../entities/get-entities';
 import WorldConfig from '../entities/world-config';
 
 export default function spawnShipSystem(world: WorldConfig) {
@@ -14,7 +15,7 @@ export default function spawnShipSystem(world: WorldConfig) {
 		const SHIP_SPEED = 100;
 		getEntitiesWithComponents(world, ['controller']).forEach(stationEid => {
 			if(controller.money[stationEid] > 0) {
-				let shipEid = Atomics.add(world.idCounter, 0, 1) + 1;
+				let shipEid = createEntity(world);
 				addComponents(world.components, shipEid, ['entity', 'position', 'health', 'velocity', 'controlled', 'attack']);
 
 				Atomics.store(position.width, shipEid, 10 * 1_000);

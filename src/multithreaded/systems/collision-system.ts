@@ -1,9 +1,10 @@
 import computeAngle from '@/math/compute-angle';
 import distance from '@/math/distance';
 import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
-import { getEntitiesWithComponents } from '../components/get-entities';
+import { getEntitiesWithComponents } from '../entities/get-entities';
 import hasComponent from '../components/has-component';
 import WorldConfig from '../entities/world-config';
+import { killEntity } from '../entities/kill-entity';
 
 export default function collisionSystem(world: WorldConfig) {
 	const position = world.components.position;
@@ -98,12 +99,12 @@ export default function collisionSystem(world: WorldConfig) {
 		health.shields[eid] -= damage;
 		health.timeSinceTakenDamage[eid] = 0;
 		if(health.shields[eid] < 0) {
-			world.components.entity.dead[eid] = 1;
+			killEntity(world, eid);
 	
 			if(hasComponent(world.components, eid, 'controller')) {
 				let controlledShips = ships.filter(shipEid => world.components.controlled.owner[shipEid] === eid);
 				controlledShips.forEach(shipEid => {
-					world.components.entity.dead[shipEid] = 1;
+					killEntity(world, shipEid);
 				});
 			}
 		}

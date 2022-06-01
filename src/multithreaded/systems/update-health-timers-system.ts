@@ -1,4 +1,4 @@
-import { getEntitiesWithComponents } from '../components/get-entities';
+import { getEntitiesWithComponents } from '../entities/get-entities';
 import WorldConfig from '../entities/world-config';
 
 export default function updateHealthTimersSystem(world: WorldConfig) {

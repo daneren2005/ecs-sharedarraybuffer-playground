@@ -5,7 +5,9 @@ interface WorldConfig {
 		width: number,
 		height: number
 	};
-	idCounter: Int32Array;
+	idCounter: Uint32Array;
+	recycledIds: Uint32Array;
+	recycledIndexes: Uint32Array;
 	components: Components;
 }
 

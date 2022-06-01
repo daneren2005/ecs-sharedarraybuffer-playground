@@ -23,7 +23,7 @@ import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
 import World from './entities/world';
 import { INT_FLOAT_MULTIPLIER } from './constants';
-import { getAllEntitiesWithComponents, getEntitiesWithComponents } from './components/get-entities';
+import { getAllEntitiesWithComponents, getEntitiesWithComponents } from './entities/get-entities';
 import hasComponent from './components/has-component';
 
 const supportsSharedArrayBuffers = !!window.SharedArrayBuffer;
@@ -126,13 +126,6 @@ onMounted(() => {
 							image.setScale(position.width[eid] / image.width / INT_FLOAT_MULTIPLIER, position.height[eid] / image.height / INT_FLOAT_MULTIPLIER);
 							image.shieldImage = add.image(0, 0, 'shield');
 							image.shieldImage.setScale(position.width[eid] / image.shieldImage.width / INT_FLOAT_MULTIPLIER * 2,position.height[eid] / image.shieldImage.height / INT_FLOAT_MULTIPLIER * 2);
-
-							if(hasComponent(world.components, eid, 'controller')) {
-								image.setTint(Atomics.load(world.components.controller.color, eid));
-							} else if(hasComponent(world.components, eid, 'controlled')) {
-								let stationEid = Atomics.load(world.components.controlled.owner, eid);
-								image.setTint(Atomics.load(world.components.controller.color, stationEid));
-							}
 							eidSpriteMap.set(eid, image);
 						}
 
@@ -141,6 +134,12 @@ onMounted(() => {
 						image.angle = image.shieldImage.angle = world.components.position.angle[eid];
 						
 						image.shieldImage.visible = world.components.health.shields[eid] > 0;
+						if(hasComponent(world.components, eid, 'controller')) {
+							image.setTint(Atomics.load(world.components.controller.color, eid));
+						} else if(hasComponent(world.components, eid, 'controlled')) {
+							let stationEid = Atomics.load(world.components.controlled.owner, eid);
+							image.setTint(Atomics.load(world.components.controller.color, stationEid));
+						}
 					}
 				});
 				let end = performance.now();

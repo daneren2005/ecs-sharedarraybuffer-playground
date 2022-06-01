@@ -9,7 +9,9 @@ export default class World extends EventEmitter {
 		width: number,
 		height: number
 	} = { width: 0, height: 0 };
-	idCounter: Int32Array;
+	idCounter: Uint32Array;
+	recycledIds: Uint32Array;
+	recycledIndexes: Uint32Array;
 	components: Components;
 	systems: Array<(delta: number) => void> = [];
 	systemUpdates: { [s: string]: Array<number> } = {};
@@ -17,42 +19,44 @@ export default class World extends EventEmitter {
 
 	constructor() {
 		super();
-		this.idCounter = this.createIntegerArray(4);
+		this.idCounter = new Uint32Array(this.createBuffer(Uint32Array.BYTES_PER_ELEMENT, 4));
+		this.recycledIds = new Uint32Array(this.createBuffer());
+		this.recycledIndexes = new Uint32Array(this.createBuffer(4, 1));
 
 		this.components = {
 			entity: {
-				components: this.createIntegerArray(),
-				init: this.createIntegerArray(),
-				dead: this.createIntegerArray()
+				components: new Uint32Array(this.createBuffer()),
+				init: new Uint8Array(this.createBuffer(1)),
+				dead: new Uint8Array(this.createBuffer(1))
 			},
 			position: {
-				x: this.createIntegerArray(),
-				y: this.createIntegerArray(),
-				width: this.createIntegerArray(),
-				height: this.createIntegerArray(),
-				angle: this.createIntegerArray()
+				x: new Int32Array(this.createBuffer()),
+				y: new Int32Array(this.createBuffer()),
+				width: new Int32Array(this.createBuffer()),
+				height: new Int32Array(this.createBuffer()),
+				angle: new Int32Array(this.createBuffer())
 			},
 			velocity: {
-				x: this.createIntegerArray(),
-				y: this.createIntegerArray(),
-				speed: this.createIntegerArray()
+				x: new Int32Array(this.createBuffer()),
+				y: new Int32Array(this.createBuffer()),
+				speed: new Int32Array(this.createBuffer())
 			},
 			health: {
-				shields: this.createIntegerArray(),
-				maxShields: this.createIntegerArray(),
-				timeToRegenerateShields: this.createIntegerArray(),
-				timeSinceShieldRegeneration: this.createIntegerArray(),
-				timeSinceTakenDamage: this.createIntegerArray()
+				shields: new Int32Array(this.createBuffer()),
+				maxShields: new Int32Array(this.createBuffer()),
+				timeToRegenerateShields: new Int32Array(this.createBuffer()),
+				timeSinceShieldRegeneration: new Int32Array(this.createBuffer()),
+				timeSinceTakenDamage: new Int32Array(this.createBuffer())
 			},
 			controller: {
-				color: this.createIntegerArray(),
-				money: this.createIntegerArray()
+				color: new Int32Array(this.createBuffer()),
+				money: new Int32Array(this.createBuffer())
 			},
 			controlled: {
-				owner: this.createIntegerArray()
+				owner: new Int32Array(this.createBuffer())
 			},
 			attack: {
-				target: this.createIntegerArray()
+				target: new Int32Array(this.createBuffer())
 			}
 		};
 
@@ -66,9 +70,8 @@ export default class World extends EventEmitter {
 		this.addSystemWorker('moveToTargetSystem', new Worker(new URL('../systems/move-to-target-worker', import.meta.url)));
 	}
 	// TODO: Resize buffers as we grow in size and recycle dead ids instead of requiring such a ridiculously huge buffer
-	private createIntegerArray(size = 65_536) {
-		let buffer = new SharedArrayBuffer(size * Int32Array.BYTES_PER_ELEMENT);
-		return new Int32Array(buffer);
+	private createBuffer(bytes = 4, size = 10_000) {
+		return new SharedArrayBuffer(size * bytes);
 	}
 
 	load(config: any) {
@@ -96,10 +99,6 @@ export default class World extends EventEmitter {
 				}
 			});
 		});
-	}
-
-	getId() {
-		return Atomics.add(this.idCounter, 0, 1) + 1;
 	}
 
 	update(delta: number) {
@@ -136,6 +135,8 @@ export default class World extends EventEmitter {
 
 		let config: WorldConfig = {
 			idCounter: this.idCounter,
+			recycledIds: this.recycledIds,
+			recycledIndexes: this.recycledIndexes,
 			bounds: this.bounds,
 			components: this.components
 		};

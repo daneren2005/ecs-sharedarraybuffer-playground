@@ -1,5 +1,6 @@
 import { EventEmitter } from 'eventemitter3';
 import { INT_FLOAT_MULTIPLIER } from '../constants';
+import { createEntity } from './create-entity';
 import World from './world';
 
 export default class Entity extends EventEmitter {
@@ -35,7 +36,7 @@ export default class Entity extends EventEmitter {
 
 	constructor(world: World) {
 		super();
-		this.eid = world.getId();
+		this.eid = createEntity(world);
 		this.world = world;
 
 		this.shields = 1;
