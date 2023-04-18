@@ -11,7 +11,7 @@ const colors = [
 	0x39ab62
 ];
 
-export default function generateScene(options: OptionsConfig) {
+export default function generateScene(options: OptionsConfig): WorldConfig {
 	let entities: Array<any> = [];
 
 	for(let i = 0; i < (options.stations ?? 0); i++) {
@@ -63,3 +63,18 @@ interface OptionsConfig {
 	width: number;
 	height: number;
 }
+interface WorldConfig {
+	entities: Array<EntityConfig>
+	bounds: {
+		width: number
+		height: number
+	}
+}
+interface EntityConfig {
+	type: 'station' | 'ship'
+	x: number
+	y: number
+	color: number
+	money: number
+}
+export { OptionsConfig, WorldConfig, EntityConfig };

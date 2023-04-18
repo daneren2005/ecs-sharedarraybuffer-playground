@@ -12,6 +12,11 @@ const routes: Array<RouteRecordRaw> = [
 		component: () => import(/* webpackChunkName: "bitecs" */ '../bitecs/BitECSGame.vue')
 	},
 	{
+		path: '/bagelecs',
+		name: 'bagelecs',
+		component: () => import(/* webpackChunkName: "bagelecs" */ '../bagelecs/BagelECSGame.vue')
+	},
+	{
 		path: '/multithreaded',
 		alias: '/',
 		name: 'multithreaded',
