@@ -1,19 +1,17 @@
-import { defineSystem } from 'thyseus';
+import { Entity, defineSystem } from 'thyseus';
 import Position from '../components/position';
 import Controller from '../components/controller';
 import Health from '../components/health';
 
 export default function renderStationSystem(scene: Phaser.Scene) {
-	const eidSpriteMap = new Map<number, any>();
+	const eidSpriteMap = new Map<bigint, any>();
 
 	return defineSystem(
-		({ Query }) => [Query([Position, Controller, Health])],
+		({ Query, Commands }) => [Query([Entity, Position, Controller, Health]), Commands()],
 
-		function renderStationSystem(query) {
-			for(const [position, controller, health] of query) {
-				// We need a really id for an entity so we can update this properly
-				// @ts-expect-error
-				const eid = position.__$$b;
+		function renderStationSystem(query, commands) {
+			for(const [entity, position, controller, health] of query) {
+				const eid = entity.id;
 
 				let image = eidSpriteMap.get(eid);
 				if(health.dead) {
@@ -21,9 +19,7 @@ export default function renderStationSystem(scene: Phaser.Scene) {
 						image.destroy();
 						image.shieldImage.destroy();
 						eidSpriteMap.delete(eid);
-
-						// TODO: How the heck do we kill this?
-						// commands.despawn()
+						commands.despawn(eid);
 					}
 				} else {
 					if(!image) {

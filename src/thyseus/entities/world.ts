@@ -10,12 +10,14 @@ import renderShipSystem from '../systems/render-ship-system';
 import { spawnShipSystem } from '../systems/spawn-ship-system';
 import Velocity from '../components/velocity';
 import { velocitySystem } from '../systems/velocity-system';
+import Controlled from '../components/controlled';
 
 export default async function createWorld(config: InitConfig): Promise<World> {
 	let worldBuilder = World.new();
 
 	worldBuilder.components.add(Position);
 	worldBuilder.components.add(Controller);
+	worldBuilder.components.add(Controlled);
 	worldBuilder.components.add(Health);
 	worldBuilder.components.add(Velocity);
 
