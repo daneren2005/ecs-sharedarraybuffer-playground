@@ -106,7 +106,7 @@ onMounted(async () => {
 
 				updateTimes.push(end - start);
 				updateTicks += delta;
-				/*if(updateTicks > INT_FLOAT_MULTIPLIER) {
+				if(updateTicks > 1_000) {
 					minUpdateTime.value = updateTimes.reduce((min, time) => {
 						return Math.min(min, time);
 					}, 1_000_000);
@@ -119,7 +119,7 @@ onMounted(async () => {
 					updateTimes = [];
 					updateTicks = 0;
 
-					let stations = getEntitiesWithComponents(world, ['controller']);
+					/*let stations = getEntitiesWithComponents(world, ['controller']);
 					let ships = getEntitiesWithComponents(world, ['controlled']);
 					stationsCount.value = stations.length;
 					shipsCount.value = ships.length;
@@ -152,8 +152,8 @@ onMounted(async () => {
 						});
 
 						world.systemUpdates[systemName] = [];
-					});
-				}*/
+					});*/
+				}
 			}
 		}
 	});

@@ -1,7 +1,7 @@
 <template>
   <nav>
-	<router-link to="/multithreaded">Multithreaded</router-link> |
-	<router-link to="/thyseus">Thyseus (MT)</router-link> |
+	<router-link to="/multithreaded">Custom (MT)</router-link> |
+	<router-link to="/thyseus">Thyseus (ST)</router-link> |
 	<router-link to="/bitecs">BitECS (ST)</router-link> |
     <router-link to="/simple">Simple Entity (ST)</router-link>
   </nav>

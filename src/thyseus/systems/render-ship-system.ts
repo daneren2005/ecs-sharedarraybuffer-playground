@@ -36,7 +36,10 @@ export default function renderShipSystem(scene: Phaser.Scene) {
 					image.angle = image.shieldImage.angle = position.angle;
 					
 					image.shieldImage.visible = health.shields > 0;
-					image.setTint(controlled.color);
+					// This shouldn't be needed once the bug returning invalid controlled components is fixed
+					if(controlled.color) {
+						image.setTint(controlled.color);
+					}
 				}
 			}
 		}
