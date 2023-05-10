@@ -35,7 +35,7 @@
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
     "jest": "^27.0.5",
-    "thyseus": "^0.11.0",
+    "thyseus": "^0.12.0-beta.3",
     "ts-jest": "^27.0.4",
     "typescript": "~4.5.5"
   }

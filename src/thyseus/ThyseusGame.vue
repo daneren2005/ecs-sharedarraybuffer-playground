@@ -21,7 +21,7 @@
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
-import { World } from 'thyseus';
+import { CoreSchedule, World } from 'thyseus';
 import createWorld from './entities/world';
 
 const supportsSharedArrayBuffers = !!window.SharedArrayBuffer;
@@ -58,13 +58,14 @@ onMounted(async () => {
 			async create() {
 				world = await createWorld({
 					worldConfig: generateScene({
-						stations: 10,
+						stations: 6,
 						shipsPerStation: 100,
 						width,
 						height
 					}),
 					scene: this
 				});
+				await world.runSchedule(CoreSchedule.Startup);
 
 				/*let stations = getEntitiesWithComponents(world, ['controller']);
 				stationShips.value = stations.map(eid => {
@@ -101,7 +102,7 @@ onMounted(async () => {
 				}
 
 				let start = performance.now();
-				await world.update();
+				await world.runSchedule(CoreSchedule.Main);
 				let end = performance.now();
 
 				updateTimes.push(end - start);

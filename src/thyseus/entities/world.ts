@@ -1,35 +1,37 @@
 import { WorldConfig } from '@/data/generate-scene';
-import { World } from 'thyseus';
+import { CoreSchedule, World } from 'thyseus';
 import { loadWorldSystem } from '../systems/load-world-system';
 import Position from '../components/position';
 import Controller from '../components/controller';
-import renderStationSystem from '../systems/render-station-system';
 import Phaser from 'phaser';
 import Health from '../components/health';
-import renderShipSystem from '../systems/render-ship-system';
-import { spawnShipSystem } from '../systems/spawn-ship-system';
+import spawnShipSystem from '../systems/spawn-ship-system';
 import Velocity from '../components/velocity';
-import { velocitySystem } from '../systems/velocity-system';
-import Controlled from '../components/controlled';
+import velocitySystem from '../systems/velocity-system';
+import renderSystem from '../systems/render-system';
+import collisionSystem from '../systems/collisions-system';
+import Faction from '../components/faction';
 
 export default async function createWorld(config: InitConfig): Promise<World> {
 	let worldBuilder = World.new();
 
 	worldBuilder.components.add(Position);
+	worldBuilder.components.add(Faction);
 	worldBuilder.components.add(Controller);
-	worldBuilder.components.add(Controlled);
 	worldBuilder.components.add(Health);
 	worldBuilder.components.add(Velocity);
 
-	worldBuilder.addStartupSystem(loadWorldSystem(config.worldConfig));
+	worldBuilder.addSystemsToSchedule(
+		CoreSchedule.Startup,
+		loadWorldSystem(config.worldConfig, config.scene)
+	);
 
-	// TODO: This is separate because they reference different systems
-	// If we end up not being able to reference eid in Controlled, we might as well move color into health or position and simplify this to a single renderer
-	worldBuilder.addSystem(renderStationSystem(config.scene));
-	worldBuilder.addSystem(renderShipSystem(config.scene));
-
-	worldBuilder.addSystem(spawnShipSystem);
-	worldBuilder.addSystem(velocitySystem);
+	worldBuilder.addSystems(
+		renderSystem,
+		spawnShipSystem,
+		velocitySystem,
+		collisionSystem
+	);
 
 	return worldBuilder.build();
 }
