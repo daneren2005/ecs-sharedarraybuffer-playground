@@ -2,40 +2,30 @@
   "name": "ecs-sharedarraybuffer-playground",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "serve": "vue-cli-service serve",
-	"start": "npm run serve",
-    "build": "vue-cli-service build",
-    "test:unit": "vue-cli-service test:unit",
-    "lint": "vue-cli-service lint --mode production"
+    "serve": "vite",
+    "start": "npm run serve",
+    "build": "vite build",
+    "lint": "eslint src/ --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --ignore-path .gitignore",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "core-js": "^3.8.3",
-    "phaser": "^3.55.2",
-    "vue": "^3.2.13",
-    "vue-class-component": "^8.0.0-0",
-    "vue-router": "^4.0.3"
+    "core-js": "^3.36.0",
+    "phaser": "^3.80.1",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
-    "@timohausmann/quadtree-ts": "^2.0.0-beta.1",
-    "@types/jest": "^27.0.1",
-    "@typescript-eslint/eslint-plugin": "^5.4.0",
-    "@typescript-eslint/parser": "^5.4.0",
-    "@vue/cli-plugin-babel": "~5.0.0",
-    "@vue/cli-plugin-eslint": "~5.0.0",
-    "@vue/cli-plugin-router": "~5.0.0",
-    "@vue/cli-plugin-typescript": "~5.0.0",
-    "@vue/cli-plugin-unit-jest": "~5.0.0",
-    "@vue/cli-service": "~5.0.0",
-    "@vue/eslint-config-typescript": "^9.1.0",
-    "@vue/test-utils": "^2.0.0-0",
-    "@vue/vue3-jest": "^27.0.0-alpha.1",
-    "babel-jest": "^27.0.6",
-    "bitecs": "^0.3.38",
-    "eslint": "^7.32.0",
-    "eslint-plugin-vue": "^8.0.3",
-    "jest": "^27.0.5",
-    "ts-jest": "^27.0.4",
-    "typescript": "~4.5.5"
+    "@timohausmann/quadtree-ts": "^2.2.2",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "bitecs": "^0.3.40",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.22.0",
+    "typescript": "~5.3.3",
+    "vite": "^5.1.4"
   }
 }

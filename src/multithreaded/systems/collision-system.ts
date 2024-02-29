@@ -1,6 +1,6 @@
 import computeAngle from '@/math/compute-angle';
 import distance from '@/math/distance';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
 import { getEntitiesWithComponents } from '../entities/get-entities';
 import hasComponent from '../components/has-component';
 import WorldConfig from '../entities/world-config';

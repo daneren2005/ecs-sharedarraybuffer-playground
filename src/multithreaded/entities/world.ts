@@ -4,6 +4,13 @@ import Station from './station';
 import Components from '../components/components';
 import WorldConfig from './world-config';
 
+import SpawnShipWorker from '../systems/spawn-ship-worker?worker';
+import VelocityWorker from '../systems/velocity-worker?worker';
+import CollisionWorker from '../systems/collision-worker?worker';
+import UpdateHealthTimersWorker from '../systems/update-health-timers-worker?worker';
+import TargetEnemyWorker from '../systems/target-enemy-worker?worker';
+import MoveToTargetWorker from '../systems/move-to-target-worker?worker';
+
 export default class World extends EventEmitter {
 	bounds: {
 		width: number,
@@ -60,14 +67,14 @@ export default class World extends EventEmitter {
 			}
 		};
 
-		this.addSystemWorker('spawnShipSystem', new Worker(new URL('../systems/spawn-ship-worker', import.meta.url)));
-		this.addSystemWorker('velocitySystem', new Worker(new URL('../systems/velocity-worker', import.meta.url)));
+		this.addSystemWorker('spawnShipSystem', new SpawnShipWorker());
+		this.addSystemWorker('velocitySystem', new VelocityWorker());
 		// TODO: Shard into 2 collision threads
-		this.addSystemWorker('collisionSystem', new Worker(new URL('../systems/collision-worker', import.meta.url)));
-		this.addSystemWorker('updateHealthTimersSystem', new Worker(new URL('../systems/update-health-timers-worker', import.meta.url)));
+		this.addSystemWorker('collisionSystem', new CollisionWorker());
+		this.addSystemWorker('updateHealthTimersSystem', new UpdateHealthTimersWorker());
 		// TODO: Shard into 2-4 targeting threads
-		this.addSystemWorker('targetEnemySystem', new Worker(new URL('../systems/target-enemy-worker', import.meta.url)));
-		this.addSystemWorker('moveToTargetSystem', new Worker(new URL('../systems/move-to-target-worker', import.meta.url)));
+		this.addSystemWorker('targetEnemySystem', new TargetEnemyWorker());
+		this.addSystemWorker('moveToTargetSystem', new MoveToTargetWorker());
 	}
 	// TODO: Resize buffers as we grow in size and recycle dead ids instead of requiring such a ridiculously huge buffer
 	private createBuffer(bytes = 4, size = 10_000) {

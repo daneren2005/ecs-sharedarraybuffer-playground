@@ -1,4 +1,4 @@
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
 import { getEntitiesWithComponents } from '../entities/get-entities';
 import WorldConfig from '../entities/world-config';
 import euclideanDistance from '@/math/euclidean-distance';

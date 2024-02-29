@@ -1,6 +1,6 @@
 import { defineQuery, IWorld } from 'bitecs';
 import World from '../entities/world';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
 
 export default function createQuadTreeSystem(world: World) {
 	const position = world.components.position;

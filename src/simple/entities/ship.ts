@@ -3,7 +3,8 @@ import distance from '@/math/distance';
 import euclideanDistance from '@/math/euclidean-distance';
 import Entity from './entity';
 import Station from './station';
-const PhaserMath = require('phaser/src/math');
+// @ts-expect-error
+import PhaserMath from 'phaser/src/math';
 
 export default class Ship extends Entity {
 	station: Station;

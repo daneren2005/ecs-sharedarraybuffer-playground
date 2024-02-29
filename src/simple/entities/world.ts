@@ -1,7 +1,7 @@
 import { EventEmitter } from 'eventemitter3';
 import Entity from './entity';
 import Station from './station';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
 import euclideanDistance from '@/math/euclidean-distance';
 
 export default class World extends EventEmitter {

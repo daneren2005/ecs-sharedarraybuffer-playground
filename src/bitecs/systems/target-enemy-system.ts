@@ -1,6 +1,6 @@
 import { defineQuery, hasComponent, IWorld } from 'bitecs';
 import World from '../entities/world';
-import { Rectangle } from '@timohausmann/quadtree-ts/src/index.esm';
+import { Rectangle } from '@timohausmann/quadtree-ts';
 import euclideanDistance from '@/math/euclidean-distance';
 
 export default function targetEnemySystem(world: World) {

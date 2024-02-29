@@ -1,7 +1,8 @@
 import { defineQuery, IWorld } from 'bitecs';
 import World from '../entities/world';
 import computeAngle from '@/math/compute-angle';
-const PhaserMath = require('phaser/src/math');
+// @ts-expect-error
+import PhaserMath from 'phaser/src/math';
 
 export default function moveToTargetSystem(world: World) {
 	const position = world.components.position;
