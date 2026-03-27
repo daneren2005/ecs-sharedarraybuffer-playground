@@ -19,8 +19,6 @@ jobs:
           node-version: 24
           cache: 'npm'
       - run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run lint
       - run: npm run type-check
       - run: npm run build
