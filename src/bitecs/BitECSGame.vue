@@ -18,14 +18,36 @@
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
-import World from './entities/world';
-import Entity from './entities/entity';
-import Station from './entities/station';
-import Ship from './entities/ship';
-import { Changed, defineQuery } from 'bitecs';
+import { addComponent, addEntity, Changed, createWorld, defineQuery, hasComponent } from 'bitecs';
 import components from './components';
+import createQuadTreeSystem from './systems/create-quad-tree-system';
+import spawnShipSystem from './systems/spawn-ship-system';
+import targetEnemySystem from './systems/target-enemy-system';
+import moveToTargetSystem from './systems/move-to-target-system';
+import velocitySystem from './systems/velocity-system';
+import collisionSystem from './systems/collision-system';
+import updateHealthTimersSystem from './systems/update-health-timers-system';
+import { GameWorld } from './systems/game-world';
 
-let world = new World();
+const ecs = createWorld() as GameWorld;
+const bounds = {
+	width: 0,
+	height: 0
+};
+const systems = [
+	{ name: 'quadTreeSystem', update: createQuadTreeSystem({ bounds }) },
+	{ name: 'spawnShipSystem', update: spawnShipSystem() },
+	{ name: 'targetEnemySystem', update: targetEnemySystem() },
+	{ name: 'moveToTargetSystem', update: moveToTargetSystem() },
+	{ name: 'velocitySystem', update: velocitySystem({ bounds }) },
+	{ name: 'collisionSystem', update: collisionSystem() },
+	{ name: 'updateHealthTimersSystem', update: updateHealthTimersSystem() }
+];
+const systemUpdatesByName: { [s: string]: Array<number> } = {};
+systems.forEach(system => {
+	systemUpdatesByName[system.name] = [];
+});
+
 const minUpdateTime = ref(0);
 const maxUpdateTime = ref(0);
 const avgUpdateTime = ref(0);
@@ -34,6 +56,8 @@ const shipsCount = ref(0);
 const stationShips = ref([]) as Ref<Array<{ eid: number, color: number, displayColor: string, ships: number }>>;
 const stationQuery = defineQuery([components.controller]);
 const systemUpdates = ref([]) as Ref<Array<{ name: string, min: number, avg: number, max: number }>>;
+const controlledQuery = defineQuery([components.controlled]);
+const renderableQuery = defineQuery([components.position, components.health]);
 
 let game: Phaser.Game | null;
 onMounted(() => {
@@ -45,60 +69,47 @@ onMounted(() => {
 	let paused = false;
 	const changedPositionQuery = defineQuery([ Changed(components.position) ]);
 	const changedHealthQuery = defineQuery([ Changed(components.health) ]);
-	const controlledQuery = defineQuery([components.controlled]);
 	const eidSpriteMap = new Map<number, any>();
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
 		width,
 		height,
 		parent: 'phaser-container-bitecs',
-		// @ts-expect-error
 		scene: {
-			preload() {
+			preload(this: Phaser.Scene) {
 				this.load.image('boid', 'boid.png');
 				this.load.image('station', 'station.png');
 				this.load.image('shield', 'shield3.png');
 			},
-			create() {
-				world.on('entity-added', (entity: Entity) => {
-					let image = this.add.image(entity.x, entity.y, entity.key) as any;
-					image.setScale(entity.width / image.width, entity.height / image.height);
-					image.shieldImage = this.add.image(entity.x, entity.y, 'shield');
-					image.shieldImage.setScale(entity.width / image.shieldImage.width * 2, entity.height / image.shieldImage.height * 2);
-					image.shieldImage.visible = entity.shields > 0;
-					if(entity instanceof Station || entity instanceof Ship) {
-						image.setTint(entity.color);
-					}
-					eidSpriteMap.set(entity.eid, image);
-				});
-
-				world.load(generateScene({
+			create(this: Phaser.Scene) {
+				loadScene(generateScene({
 					stations: 6,
 					shipsPerStation: 100,
 					width,
 					height
 				}));
 
-				let stations = world.entities.filter(entity => entity instanceof Station) as Array<Station>;
-				stationShips.value = stations.map(station => {
-					let displayColor = '#' + station.color.toString(16);
+				let stations = stationQuery(ecs).filter(eid => !components.health.dead[eid]);
+				stationShips.value = stations.map(eid => {
+					let color = components.controller.color[eid];
+					let displayColor = '#' + color.toString(16);
 					if(displayColor === '#ffffff') {
-						displayColor = '#00000';
+						displayColor = '#000000';
 					}
 
 					return {
-						eid: station.eid,
-						color: station.color,
+						eid,
+						color,
 						displayColor,
 						ships: 0
 					};
 				});
 
-				this.input.keyboard.on('keydown-SPACE', () => {
+				this.input.keyboard?.on('keydown-SPACE', () => {
 					paused = !paused;
 				});
 
-				Object.keys(world.systemUpdates).forEach(systemName => {
+				Object.keys(systemUpdatesByName).forEach(systemName => {
 					systemUpdates.value.push({
 						name: systemName,
 						min:0,
@@ -107,15 +118,40 @@ onMounted(() => {
 					});
 				});
 			},
-			update(time: number, delta: number) {
+			update(this: Phaser.Scene, time: number, delta: number) {
 				if(paused) {
 					return;
 				}
 
 				let start = performance.now();
-				world.update(delta / 1_000);
+				updateSystems(delta / 1_000);
 
-				changedPositionQuery(world.ecs).forEach(eid => {
+				renderableQuery(ecs).forEach(eid => {
+					if(eidSpriteMap.has(eid) || components.health.dead[eid]) {
+						return;
+					}
+
+					let key = hasComponent(ecs, components.controller, eid) ? 'station' : 'boid';
+					let image = this.add.image(components.position.x[eid], components.position.y[eid], key) as any;
+					image.setScale(components.position.width[eid] / image.width, components.position.height[eid] / image.height);
+					image.shieldImage = this.add.image(components.position.x[eid], components.position.y[eid], 'shield');
+					image.shieldImage.setScale(
+						components.position.width[eid] / image.shieldImage.width * 2,
+						components.position.height[eid] / image.shieldImage.height * 2
+					);
+					image.shieldImage.visible = components.health.shields[eid] > 0;
+
+					if(hasComponent(ecs, components.controller, eid)) {
+						image.setTint(components.controller.color[eid]);
+					} else if(hasComponent(ecs, components.controlled, eid)) {
+						let ownerEid = components.controlled.owner[eid];
+						image.setTint(components.controller.color[ownerEid]);
+					}
+
+					eidSpriteMap.set(eid, image);
+				});
+
+				changedPositionQuery(ecs).forEach(eid => {
 					let image = eidSpriteMap.get(eid);
 					if(!image) {
 						return;
@@ -125,7 +161,7 @@ onMounted(() => {
 					image.y = image.shieldImage.y = components.position.y[eid];
 					image.angle = image.shieldImage.angle = components.position.angle[eid];
 				});
-				changedHealthQuery(world.ecs).forEach(eid => {
+				changedHealthQuery(ecs).forEach(eid => {
 					let image = eidSpriteMap.get(eid);
 					if(!image) {
 						return;
@@ -155,10 +191,9 @@ onMounted(() => {
 					updateTimes = [];
 					updateTicks = 0;
 
-					stationsCount.value = world.entities.filter(entity => entity instanceof Station).length;
-
-					let stations = stationQuery(world.ecs).filter(eid => !components.health.dead[eid]);
-					let ships = controlledQuery(world.ecs).filter(eid => !components.health.dead[eid]);
+					let stations = stationQuery(ecs).filter(eid => !components.health.dead[eid]);
+					let ships = controlledQuery(ecs).filter(eid => !components.health.dead[eid]);
+					stationsCount.value = stations.length;
 					shipsCount.value = ships.length;
 					stationShips.value.forEach(val => {
 						let matchingStationEid = stations.find(eid => components.controller.color[eid] === val.color);
@@ -171,8 +206,8 @@ onMounted(() => {
 					});
 
 					systemUpdates.value = [];
-					Object.keys(world.systemUpdates).forEach(systemName => {
-						let updates = world.systemUpdates[systemName];
+					Object.keys(systemUpdatesByName).forEach(systemName => {
+						let updates = systemUpdatesByName[systemName];
 
 						systemUpdates.value.push({
 							name: systemName,
@@ -187,7 +222,7 @@ onMounted(() => {
 							}, 0)
 						});
 
-						world.systemUpdates[systemName] = [];
+						systemUpdatesByName[systemName] = [];
 					});
 				}
 			}
@@ -196,15 +231,55 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
 	if(game) {
-		game.destroy();
+		game.destroy(true);
 		game = null;
 	} 
 });
 
 function addShips() {
-	stationQuery(world.ecs).forEach(eid => {
-		world.components.controller.money[eid] += 10;
+	stationQuery(ecs).forEach(eid => {
+		components.controller.money[eid] += 10;
 	});
+}
+
+function updateSystems(delta: number) {
+	systems.forEach(system => {
+		let start = performance.now();
+		system.update(ecs, delta);
+		systemUpdatesByName[system.name].push(performance.now() - start);
+	});
+}
+
+function loadScene(config: any) {
+	bounds.width = config.bounds.width;
+	bounds.height = config.bounds.height;
+
+	config.entities.forEach((entityConfig: any) => {
+		if(entityConfig.type === 'station') {
+			createStation(entityConfig);
+		}
+	});
+}
+
+function createStation(config: { x: number, y: number, color: number, money: number }) {
+	let eid = addEntity(ecs);
+	addComponent(ecs, components.position, eid);
+	addComponent(ecs, components.health, eid);
+	addComponent(ecs, components.controller, eid);
+
+	components.position.x[eid] = config.x;
+	components.position.y[eid] = config.y;
+	components.position.width[eid] = 20;
+	components.position.height[eid] = 20;
+	components.position.angle[eid] = 0;
+	components.health.shields[eid] = 2;
+	components.health.maxShields[eid] = 2;
+	components.health.timeToRegenerateShields[eid] = 5;
+	components.health.timeSinceShieldRegeneration[eid] = 0;
+	components.health.timeSinceTakenDamage[eid] = 0;
+	components.health.dead[eid] = 0;
+	components.controller.color[eid] = config.color;
+	components.controller.money[eid] = config.money;
 }
 </script>
 

@@ -1,17 +1,18 @@
-import { defineQuery, IWorld } from 'bitecs';
-import World from '../entities/world';
+import { defineQuery } from 'bitecs';
 import computeAngle from '@/math/compute-angle';
 // @ts-expect-error
 import PhaserMath from 'phaser/src/math';
+import components from '../components';
+import { GameWorld } from './game-world';
 
-export default function moveToTargetSystem(world: World) {
-	const position = world.components.position;
-	const velocity = world.components.velocity;
-	const attack = world.components.attack;
-	const health = world.components.health;
+export default function moveToTargetSystem(_context?: unknown) {
+	const position = components.position;
+	const velocity = components.velocity;
+	const attack = components.attack;
+	const health = components.health;
 	let movingQuery = defineQuery([velocity, attack]);
 
-	return (ecs: IWorld) => {
+	return (ecs: GameWorld) => {
 		movingQuery(ecs).forEach(eid => {
 			let target = attack.target[eid];
 			if(!target || health.dead[target]) {

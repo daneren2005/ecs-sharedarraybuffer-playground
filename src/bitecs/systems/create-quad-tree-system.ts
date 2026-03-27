@@ -1,36 +1,33 @@
-import { defineQuery, IWorld } from 'bitecs';
-import World from '../entities/world';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
+import { defineQuery } from 'bitecs';
+import Flatbush from 'flatbush';
+import components from '../components';
+import { GameWorld } from './game-world';
 
-export default function createQuadTreeSystem(world: World) {
-	const position = world.components.position;
-	const health = world.components.health;
+export default function createQuadTreeSystem(context: { bounds: { width: number, height: number } }) {
+	const position = components.position;
+	const health = components.health;
 	let collidableQuery = defineQuery([position, health]);
 
-	return (ecs: IWorld) => {
-		// Create and populate quadtree
-		let quadtree = new Quadtree({
-			width: world.bounds.width,
-			height: world.bounds.height
-		});
-		collidableQuery(ecs).forEach(eid => {
-			if(health.dead[eid]) {
-				return;
-			}
-			
-			quadtree.insert(new Rectangle({
-				x: position.x[eid],
-				y: position.y[eid],
-				width: position.width[eid],
-				height: position.height[eid],
-				data: {
-					eid
-				}
-			}));
-		});
+	return (ecs: GameWorld) => {
+		let collidableEids = collidableQuery(ecs).filter(eid => !health.dead[eid]);
+		if(collidableEids.length === 0) {
+			ecs.spatialIndex = undefined;
+			ecs.spatialEids = [];
+			return ecs;
+		}
 
-		// @ts-expect-error
-		ecs.quadtree = quadtree;
+		let index = new Flatbush(collidableEids.length);
+		collidableEids.forEach(eid => {
+			let minX = Math.max(0, position.x[eid]);
+			let minY = Math.max(0, position.y[eid]);
+			let maxX = Math.min(context.bounds.width, position.x[eid] + position.width[eid]);
+			let maxY = Math.min(context.bounds.height, position.y[eid] + position.height[eid]);
+			index.add(minX, minY, maxX, maxY);
+		});
+		index.finish();
+
+		ecs.spatialIndex = index;
+		ecs.spatialEids = collidableEids;
 
 		return ecs;
 	};

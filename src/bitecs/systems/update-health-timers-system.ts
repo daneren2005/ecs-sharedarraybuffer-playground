@@ -1,11 +1,12 @@
-import { defineQuery, IWorld } from 'bitecs';
-import World from '../entities/world';
+import { defineQuery } from 'bitecs';
+import components from '../components';
+import { GameWorld } from './game-world';
 
-export default function updateHealthTimersSystem(world: World) {
-	const health = world.components.health;
+export default function updateHealthTimersSystem(_context?: unknown) {
+	const health = components.health;
 	let healthQuery = defineQuery([health]);
 
-	return (ecs: IWorld, delta: number) => {
+	return (ecs: GameWorld, delta: number) => {
 		healthQuery(ecs).forEach(eid => {
 			health.timeSinceTakenDamage[eid] += delta;
 

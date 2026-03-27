@@ -64,7 +64,7 @@ onMounted(() => {
 
 				// this.cameras.main.zoomTo(0.5, 0);
 				world.load(generateScene({
-					stations: 8,
+					stations: 10,
 					shipsPerStation: 100,
 					width,
 					height

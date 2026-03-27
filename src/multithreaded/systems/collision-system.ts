@@ -1,6 +1,6 @@
 import computeAngle from '@/math/compute-angle';
 import distance from '@/math/distance';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
+import Flatbush from 'flatbush';
 import { getEntitiesWithComponents } from '../entities/get-entities';
 import hasComponent from '../components/has-component';
 import WorldConfig from '../entities/world-config';
@@ -13,32 +13,28 @@ export default function collisionSystem(world: WorldConfig) {
 	const controller = world.components.controller;
 
 	return () => {
-		// Create and populate quadtree
-		let quadtree = new Quadtree({
-			width: world.bounds.width * 1_000,
-			height: world.bounds.height * 1_000
+		let spatialEids = getEntitiesWithComponents(world, ['position', 'health']);
+		if(spatialEids.length === 0) {
+			return;
+		}
+		let spatialIndex = new Flatbush(spatialEids.length);
+		spatialEids.forEach(eid => {
+			let x = Atomics.load(position.x, eid);
+			let y = Atomics.load(position.y, eid);
+			let width = Atomics.load(position.width, eid);
+			let height = Atomics.load(position.height, eid);
+			spatialIndex.add(x, y, x + width, y + height);
 		});
-		getEntitiesWithComponents(world, ['position', 'health']).forEach(eid => {
-			quadtree.insert(new Rectangle({
-				x: Atomics.load(position.x, eid),
-				y: Atomics.load(position.y, eid),
-				width: Atomics.load(position.width, eid),
-				height: Atomics.load(position.height, eid),
-				data: {
-					eid
-				}
-			}));
-		});
+		spatialIndex.finish();
 
-		// Use quadtree to see who we are colliding with
+		// Use spatial index to see who we are colliding with.
 		let ships = getEntitiesWithComponents(world, ['velocity']);
 		ships.forEach(eid => {
-			let entitiesInRange = quadtree.retrieve(new Rectangle({
-				x: position.x[eid],
-				y: position.y[eid],
-				width: position.width[eid],
-				height: position.height[eid]
-			})).map((result: any) => result.data.eid).filter((otherEid: number) => otherEid !== eid);
+			let x = Atomics.load(position.x, eid);
+			let y = Atomics.load(position.y, eid);
+			let width = Atomics.load(position.width, eid);
+			let height = Atomics.load(position.height, eid);
+			let entitiesInRange = spatialIndex.search(x, y, x + width, y + height).map(index => spatialEids[index]).filter((otherEid: number) => otherEid !== eid);
 			let shipColor = controller.color[controlled.owner[eid]];
 			let enemiesInRange = entitiesInRange.filter((otherEid: number) => {
 				// Ship

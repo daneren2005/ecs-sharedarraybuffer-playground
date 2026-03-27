@@ -17,8 +17,6 @@ https://daneren2005.github.io/ecs-sharedarraybuffer-playground/#/simple
 ## BitECS
 This is a rewrite using a ECS framework: https://github.com/NateTheGreatt/bitECS.  I don't think that it claims to be the fastest one around, but I'm pretty sure it is fast enough to representative of an ECS framework.  This implementation runs the different systems at different rates (ie: velocity every tick, but collisions every other tick, and deciding where to go next only a few times a second).  This is possible to do in the simple entity implementation as well, but ECS makes it way easier.  Heavy systems are run in chunks so that if we can finish the run in 10ms increments over the 200ms runtime, the framerate stays good.  If we end up needing more than 200ms to compute the system, it runs until it is done in order to not get too far behind.  This puts an upper limit on how many entities we can process before it starts to stutter.
 
-This is my first attempt to use an ECS system, and I think I tried to hard to copy paste the simple version's logic.  A lot of this involves referencing the components in hard to follow ways, and the type system for bitecs got confused pretty easily.  This would probably look significantly better if I had just done this without my world/entity wrapper.
-
 https://daneren2005.github.io/ecs-sharedarraybuffer-playground/#/bitecs
 
 ## Custom ES backend by a shared memory pool
@@ -58,19 +56,12 @@ Cons
 * All of the difficulty of manually managing memory in C++ without any of the speed
 * Lots of boiler plate for each property to be backed by a memory location - also easy to screw up and have two properties going to one location
 
-TODO
-* Creating quad-tree or collision system in one thread and re-using in others
-* Control which entities are initialized in other threads (ie: spawn-ship-system doesn't need to create a local copy of each ship to run)
-
 
 
 ## Custom ECS backed by SharedArrayBuffers
 In this version, we have a quick and dirty ECS system where the components are hard coded and each SharedArrayBuffer is a large fixed length int array.  Dead entity id's are recycled and re-used again.  Each component is using SharedArrayBuffers and Atomics to load and update properties.  Each system runs in it's own thread.  All the main thread is doing every frame is looping through every entity and updating it's visual properties (ie: position, angle, etc...).  As a huge number of ships are added stuff starts to not work 100% correctly since some of the sub-systems take too long to process, but visually continue to hum along nicely.  That could probably be fixed by sharding the heavy systems into multiple threads.  For a proof of concept I think this is good enough.
 
 https://daneren2005.github.io/ecs-sharedarraybuffer-playground/#/multithreaded
-
-### Things that suck that I don't know how to solve
-* Atomics only supports integers - POC used / 1000 for 4 decimal places, but reduces how big the numbers can be and possibly isn't precise enough in some cases.  It also adds it's own mental and computational overhead and makes the code uglier.
 
 ### Things that suck about my implementation but can be solved
 * I copied bitECS way of having a single entity id used in components even though not all entities use every component.  Going to end up with a lot of wasted memory.

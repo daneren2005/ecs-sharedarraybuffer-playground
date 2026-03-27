@@ -3,7 +3,7 @@ import Entity from '../entities/entity';
 import Ship from '../entities/ship';
 import World from '../entities/world';
 import createWorkerSystem from './create-worker-system';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
+import Flatbush from 'flatbush';
 import Station from '../entities/station';
 
 class TargetEnemySystem {
@@ -14,34 +14,26 @@ class TargetEnemySystem {
 	}
 
 	run() {
-		// Create and populate quadtree
-		let quadtree = new Quadtree({
-			width: this.world.bounds.width,
-			height: this.world.bounds.height
+		let indexedEntities = this.world.entities.filter(entity => !entity.dead);
+		if(indexedEntities.length === 0) {
+			return;
+		}
+		let spatialIndex = new Flatbush(indexedEntities.length);
+		indexedEntities.forEach(entity => {
+			spatialIndex.add(entity.x, entity.y, entity.x + entity.width, entity.y + entity.height);
 		});
-
-		this.world.entities.forEach(entity => {
-			quadtree.insert(new Rectangle({
-				x: entity.x,
-				y: entity.y,
-				width: entity.width,
-				height: entity.height,
-				data: {
-					entity
-				}
-			}));
-		});
+		spatialIndex.finish();
 
 		let ships = this.world.entities.filter(entity => entity instanceof Ship) as Array<Ship>;
 		ships.forEach(entity => {
-			let target = getNearestEnemy(quadtree as Quadtree<Rectangle>, entity);
+			let target = getNearestEnemy(spatialIndex, indexedEntities, entity);
 			entity.targetPointer = target?.pointer ?? 0;
 		});
 	}
 }
 
-function getNearestEnemy(quadtree: Quadtree<Rectangle>, ship: Ship): Entity | undefined {
-	let nearesetEnemy = getNearestEntity(quadtree, ship, entity => {
+function getNearestEnemy(spatialIndex: Flatbush, indexedEntities: Array<Entity>, ship: Ship): Entity | undefined {
+	let nearesetEnemy = getNearestEntity(spatialIndex, indexedEntities, ship, entity => {
 		if(entity instanceof Station) {
 			return entity !== ship.station;
 		} else if(entity instanceof Ship) {
@@ -62,7 +54,7 @@ function getNearestEnemy(quadtree: Quadtree<Rectangle>, ship: Ship): Entity | un
 		return stations[0];
 	}
 }
-function getNearestEntity(quadtree: Quadtree<Rectangle>, entity: Entity, filter: (entity: Entity) => boolean) {
+function getNearestEntity(spatialIndex: Flatbush, indexedEntities: Array<Entity>, entity: Entity, filter: (entity: Entity) => boolean) {
 	let rect = {
 		x: entity.x - 50,
 		y: entity.y - 50,
@@ -70,13 +62,13 @@ function getNearestEntity(quadtree: Quadtree<Rectangle>, entity: Entity, filter:
 		height: entity.height + 100
 	};
 
-	let entities = getEntitiesInRange(quadtree, rect).filter(otherEntity => otherEntity !== entity && !otherEntity.dead && filter(otherEntity));
+	let entities = getEntitiesInRange(spatialIndex, indexedEntities, rect).filter(otherEntity => otherEntity !== entity && !otherEntity.dead && filter(otherEntity));
 	if(entities.length === 0) {
 		rect.x -= 100;
 		rect.y -= 100;
 		rect.width += 200;
 		rect.height += 200;
-		entities = getEntitiesInRange(quadtree, rect).filter(otherEntity => otherEntity !== entity && filter(otherEntity));
+		entities = getEntitiesInRange(spatialIndex, indexedEntities, rect).filter(otherEntity => otherEntity !== entity && filter(otherEntity));
 	}
 
 	entities.sort((a, b) => {
@@ -84,8 +76,8 @@ function getNearestEntity(quadtree: Quadtree<Rectangle>, entity: Entity, filter:
 	});
 	return entities[0] ?? null;
 }
-function getEntitiesInRange(quadtree: Quadtree<Rectangle>, range: { x: number, y: number, width: number, height: number }): Array<Entity> {
-	return quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data.entity);
+function getEntitiesInRange(spatialIndex: Flatbush, indexedEntities: Array<Entity>, range: { x: number, y: number, width: number, height: number }): Array<Entity> {
+	return spatialIndex.search(range.x, range.y, range.x + range.width, range.y + range.height).map(index => indexedEntities[index]);
 }
 
 createWorkerSystem((world: World) => new TargetEnemySystem(world));

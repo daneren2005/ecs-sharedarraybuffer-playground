@@ -1,15 +1,15 @@
-import { defineQuery, hasComponent, IWorld } from 'bitecs';
-import World from '../entities/world';
-import { Rectangle } from '@timohausmann/quadtree-ts';
+import { defineQuery, hasComponent } from 'bitecs';
 import euclideanDistance from '@/math/euclidean-distance';
+import components from '../components';
+import { GameWorld } from './game-world';
 
-export default function targetEnemySystem(world: World) {
-	const position = world.components.position;
-	const velocity = world.components.velocity;
-	const controlled = world.components.controlled;
-	const controller = world.components.controller;
-	const health = world.components.health;
-	const attack = world.components.attack;
+export default function targetEnemySystem(_context?: unknown) {
+	const position = components.position;
+	const velocity = components.velocity;
+	const controlled = components.controlled;
+	const controller = components.controller;
+	const health = components.health;
+	const attack = components.attack;
 	let movingQuery = defineQuery([velocity, attack]);
 	let controllerQuery = defineQuery([controller]);
 
@@ -17,7 +17,7 @@ export default function targetEnemySystem(world: World) {
 	let timeSinceLastTick = TIME_BETWEEN_TICKS + 1;
 	let movingEntities: Array<number> = [];
 	let minCountToUpdate = 0;
-	return (ecs: IWorld, delta: number) => {
+	return (ecs: GameWorld, delta: number) => {
 		// Run through all of entities eventually, but don't have more than half a frame's time to do a block of them
 		timeSinceLastTick += delta;
 		if(timeSinceLastTick > TIME_BETWEEN_TICKS && movingEntities.length === 0) {
@@ -26,11 +26,14 @@ export default function targetEnemySystem(world: World) {
 			timeSinceLastTick = 0;
 		}
 
-		// @ts-expect-error
-		let quadtree = ecs.quadtree;
+		let spatialIndex = ecs.spatialIndex;
+		let spatialEids = ecs.spatialEids;
+		if(!spatialIndex || !spatialEids) {
+			return ecs;
+		}
 		let start = performance.now();
 
-		// Use quadtree to see who we are colliding with
+		// Use spatial index to find nearby enemies.
 		for(let i = 0; i < movingEntities.length; i++) {
 			let eid = movingEntities[i];
 			let shipColor = controller.color[controlled.owner[eid]];
@@ -42,13 +45,13 @@ export default function targetEnemySystem(world: World) {
 				width: position.width[eid] + 100,
 				height: position.height[eid] + 100
 			};
-			let enemies = getEnemiesInRange(quadtree, ecs, rect, eid, shipColor, world);
+			let enemies = getEnemiesInRange(spatialIndex, spatialEids, ecs, rect, eid, shipColor);
 			if(enemies.length === 0) {
 				rect.x -= 100;
 				rect.y -= 100;
 				rect.width += 200;
 				rect.height += 200;
-				enemies = getEnemiesInRange(quadtree, ecs, rect, eid, shipColor, world);
+				enemies = getEnemiesInRange(spatialIndex, spatialEids, ecs, rect, eid, shipColor);
 			}
 	
 			enemies.sort((a, b) => {
@@ -82,11 +85,15 @@ export default function targetEnemySystem(world: World) {
 	};
 }
 
-function getEnemiesInRange(quadtree: any, ecs: IWorld, range: { x: number, y: number, width: number, height: number }, eid: number, shipColor: number, world: World) : Array<number> {
-	const controlled = world.components.controlled;
-	const controller = world.components.controller;
+function getEnemiesInRange(spatialIndex: NonNullable<GameWorld['spatialIndex']>, spatialEids: Array<number>, ecs: GameWorld, range: { x: number, y: number, width: number, height: number }, eid: number, shipColor: number) : Array<number> {
+	const controlled = components.controlled;
+	const controller = components.controller;
 
-	let entitiesInRange = quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data.eid).filter((otherEid: number) => otherEid !== eid);
+	let minX = range.x;
+	let minY = range.y;
+	let maxX = range.x + range.width;
+	let maxY = range.y + range.height;
+	let entitiesInRange = spatialIndex.search(minX, minY, maxX, maxY).map(index => spatialEids[index]).filter((otherEid: number) => otherEid !== eid);
 	return entitiesInRange.filter((otherEid: number) => {
 		// Ship
 		if(hasComponent(ecs, controlled, otherEid)) {
