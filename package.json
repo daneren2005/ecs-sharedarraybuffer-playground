@@ -8,12 +8,14 @@
     "start": "npm run serve",
     "build": "vite build",
     "lint": "eslint src/ --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --ignore-path .gitignore",
+    "lint:fix": "eslint src/ --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --ignore-path .gitignore --fix",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "update": "ncu",
     "update:commit": "ncu -u && npm install"
   },
   "dependencies": {
+    "@daneren2005/shared-memory-ecs": "^1.0.1",
     "@daneren2005/shared-memory-objects": "^0.0.19",
     "bitecs": "^0.3.40",
     "flatbush": "^4.5.1",

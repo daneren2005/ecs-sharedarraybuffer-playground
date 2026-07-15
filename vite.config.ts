@@ -28,7 +28,10 @@ export default defineConfig(({ mode }) => {
 		},
 
 		optimizeDeps: {
-			exclude: ['@daneren2005/shared-memory-objects']
+			exclude: [
+				'@daneren2005/shared-memory-objects',
+				'@daneren2005/shared-memory-ecs'
+			]
 		}
 	};
 });
