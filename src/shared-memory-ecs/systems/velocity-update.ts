@@ -1,18 +1,15 @@
 import type { EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
-import type { Components } from '../components';
-import type { Bounds } from './game-component-system';
+import type { Components, ComponentArrays } from '../components';
+import type { Bounds, CustomSystemWorld } from './game-component-system';
 import computeAngle from '@/math/compute-angle';
 import { POSITION_X, POSITION_Y, POSITION_ANGLE } from '../components/position';
 import { VELOCITY_X, VELOCITY_Y } from '../components/velocity';
 
 // Integrates each moving entity's position from its velocity and bounces it back off the edges of the world,
 // re-facing it along its new heading.  velocity is in pixels/second and elapsedTime is in seconds.
-export const velocityUpdate: EntityUpdateFunction<Components> = (world, entityId, components) => {
+export const velocityUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'position' | 'velocity'>, CustomSystemWorld> = (world, entityId, components) => {
 	const position = components.position;
 	const velocity = components.velocity;
-	if(!position || !velocity) {
-		return;
-	}
 
 	const bounds = world.bounds as Bounds;
 	const elapsedTime = world.elapsedTime;

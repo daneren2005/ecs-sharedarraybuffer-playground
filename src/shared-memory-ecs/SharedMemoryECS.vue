@@ -20,6 +20,7 @@
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
+import prettyMemory from '@/data/pretty-memory';
 import GameWorld from './entities/game-world';
 
 let world: GameWorld;
@@ -177,7 +178,7 @@ function getTint(eid: number): number {
 }
 
 function refreshStats() {
-	memory.value = world.heap.prettyMemory();
+	memory.value = prettyMemory(world.heap);
 
 	let stations = world.entities.filter(entity => hasComponent(entity.eid, 'controller'));
 	let ships = world.entities.filter(entity => hasComponent(entity.eid, 'controlled'));

@@ -1,6 +1,6 @@
 import Flatbush from 'flatbush';
 import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
-import type { Components } from '../components';
+import type { Components, ComponentArrays } from '../components';
 import euclideanDistance from '@/math/euclidean-distance';
 import { POSITION_X, POSITION_Y, POSITION_WIDTH, POSITION_HEIGHT } from '../components/position';
 import { CONTROLLER_COLOR } from '../components/controller';
@@ -32,11 +32,11 @@ type Scratch = ComponentSystemWorld & {
 // nothing is close, and finally falling back to the nearest enemy station so idle ships always have somewhere
 // to go.  Two library queries feed it: `collidable` (everything with a position + health, i.e. every ship and
 // station) drives the spatial index, and `stations` drives the fallback.
-export const targetEnemyUpdate: EntityUpdateFunction<Components> = (world, entityId, components) => {
+export const targetEnemyUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'attack' | 'position'>> = (world, entityId, components) => {
 	const scratch = world as Scratch;
 	const attack = components.attack;
 	const position = components.position;
-	if(!attack || !position || !scratch.spatialIndex || !scratch.spatialData || !scratch.colorByEid) {
+	if(!scratch.spatialIndex || !scratch.spatialData || !scratch.colorByEid) {
 		return;
 	}
 

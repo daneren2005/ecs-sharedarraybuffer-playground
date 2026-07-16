@@ -35,38 +35,46 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 		super(registry, {
 			factory: new EntityFactory<Components, Config>({
 				// A station: a big, slow-regenerating hub that banks money and spends it spawning ships.
-				station: { type: 'station', width: 20, height: 20, maxShields: 2, timeToRegenerateShields: 5 },
+				station: { type: 'station', width: 20, height: 20, maxShields: 2, timeToRegenerateShields: 5, damageCooldown: 0.2 },
 				// A ship: small, fast, hunts enemies.  `attacks` opts it into the targeting component and `owner`
 				// (its station's eid) is supplied per-spawn.
-				ship: { type: 'ship', width: 10, height: 5, maxShields: 1, timeToRegenerateShields: 1, speed: 100, attacks: true }
+				ship: { type: 'ship', width: 10, height: 5, maxShields: 1, timeToRegenerateShields: 1, damageCooldown: 0.2, speed: 100, attacks: true, steerForce: 4 }
 			})
 		});
+		// Systems live for the world's lifetime.  They subscribe to entity-added/-removed and BaseWorld#load only
+		// clears each system's entity list (not the systems themselves), so setting them up here is enough - load
+		// re-populates them by re-emitting entity-added for every entity in the scene.
+		this.initSystems();
 	}
 
 	load(scene: Scene) {
 		this.bounds = scene.bounds;
-		// BaseWorld#load clears the systems (and existing entities), so the scene's entities are loaded first and
-		// the systems added afterwards - their constructors then pick up every entity already in the world.
 		super.load({ entities: scene.entities });
-		this.initSystems();
 		// Kicks off worker initialization; runs work regardless of whether this has resolved yet.
 		this.init();
 	}
 
 	private initSystems() {
-		// Spend money to spawn ships.
-		this.addSystem(new GameComponentSystem(this, {
-			name: 'spawnShipSystem',
-			required: ['controller', 'position'],
-			updateFunction: spawnShipUpdate,
-			getWorker: () => new SpawnShipWorker()
-		}));
 		// Move everything and bounce it off the walls.
 		this.addSystem(new GameComponentSystem(this, {
 			name: 'velocitySystem',
 			required: ['position', 'velocity'],
 			updateFunction: velocityUpdate,
 			getWorker: () => new VelocityWorker()
+		}));
+		// Regenerate shields + tick the damage-cooldown timers.
+		this.addSystem(new GameComponentSystem(this, {
+			name: 'updateHealthTimersSystem',
+			required: ['health'],
+			updateFunction: updateHealthTimersUpdate,
+			getWorker: () => new UpdateHealthTimersWorker()
+		}));
+		// Spend money to spawn ships.
+		this.addSystem(new GameComponentSystem(this, {
+			name: 'spawnShipSystem',
+			required: ['controller', 'position'],
+			updateFunction: spawnShipUpdate,
+			getWorker: () => new SpawnShipWorker()
 		}));
 		// Resolve collisions, damage, deaths and bounties.
 		this.addSystem(new GameComponentSystem(this, {
@@ -77,13 +85,6 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 			queries: {
 				collidable: { required: ['position', 'health', 'entity'], optional: ['controller', 'controlled'] }
 			}
-		}));
-		// Regenerate shields + tick the damage-cooldown timers.
-		this.addSystem(new GameComponentSystem(this, {
-			name: 'updateHealthTimersSystem',
-			required: ['health'],
-			updateFunction: updateHealthTimersUpdate,
-			getWorker: () => new UpdateHealthTimersWorker()
 		}));
 		// Pick a target for every ship.
 		this.addSystem(new GameComponentSystem(this, {

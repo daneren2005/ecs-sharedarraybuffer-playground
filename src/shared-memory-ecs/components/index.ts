@@ -19,3 +19,11 @@ export const registry = {
 
 export type Components = ComponentsOf<typeof registry>;
 export type Config = EntityConfigOf<typeof registry>;
+
+// The concrete shared-memory block (typed array) each component stores its data in, derived straight from the
+// definition's `type` constructor.  A system's update function declares the blocks it touches with
+// `Pick<ComponentArrays, ...>` so it gets real element types (Float32Array / Int32Array / ...) instead of the
+// generic ComponentTypedArray - no casts needed at the call sites.
+export type ComponentArrays = {
+	[K in keyof typeof registry]: InstanceType<(typeof registry)[K]['type']>
+};

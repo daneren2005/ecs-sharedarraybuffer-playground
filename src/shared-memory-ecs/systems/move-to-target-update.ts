@@ -1,13 +1,10 @@
 import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
-import type { Components } from '../components';
+import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
 import normalize from '@/math/normalize';
 import { POSITION_X, POSITION_Y, POSITION_ANGLE } from '../components/position';
 import { VELOCITY_X, VELOCITY_Y, VELOCITY_SPEED } from '../components/velocity';
-import { ATTACK_TARGET } from '../components/attack';
-
-// How strongly a ship steers toward its target each tick.
-const STEER_FORCE = 4;
+import { ATTACK_TARGET, ATTACK_STEER_FORCE } from '../components/attack';
 
 interface TargetPosition {
 	x: number
@@ -20,12 +17,12 @@ type Scratch = ComponentSystemWorld & {
 // Steers each ship toward its assigned target by nudging its velocity toward the target and renormalising to
 // the ship's top speed, then re-faces it along the new heading.  Target positions are gathered once per run
 // via the `targets` query (everything with a position) so a ship can look up whoever it is chasing.
-export const moveToTargetUpdate: EntityUpdateFunction<Components> = (world, entityId, components) => {
+export const moveToTargetUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'velocity' | 'position' | 'attack'>> = (world, entityId, components) => {
 	const scratch = world as Scratch;
 	const velocity = components.velocity;
 	const position = components.position;
 	const attack = components.attack;
-	if(!velocity || !position || !attack || !scratch.positionByEid) {
+	if(!scratch.positionByEid) {
 		return;
 	}
 
@@ -40,7 +37,8 @@ export const moveToTargetUpdate: EntityUpdateFunction<Components> = (world, enti
 	const force = normalize(targetPosition.x - x, targetPosition.y - y);
 
 	const speed = velocity[VELOCITY_SPEED];
-	const steered = normalize(velocity[VELOCITY_X] + force.x * STEER_FORCE, velocity[VELOCITY_Y] + force.y * STEER_FORCE);
+	const steerForce = attack[ATTACK_STEER_FORCE];
+	const steered = normalize(velocity[VELOCITY_X] + force.x * steerForce, velocity[VELOCITY_Y] + force.y * steerForce);
 	const newVelocityX = steered.x * speed;
 	const newVelocityY = steered.y * speed;
 
