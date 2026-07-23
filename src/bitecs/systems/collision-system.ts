@@ -1,15 +1,15 @@
-import { defineQuery, hasComponent, IWorld } from 'bitecs';
-import World from '../entities/world';
-import { Rectangle } from '@timohausmann/quadtree-ts';
+import { defineQuery, hasComponent } from 'bitecs';
 import distance from '@/math/distance';
 import computeAngle from '@/math/compute-angle';
+import components from '../components';
+import { GameWorld } from './game-world';
 
-export default function collisionSystem(world: World) {
-	const position = world.components.position;
-	const velocity = world.components.velocity;
-	const controlled = world.components.controlled;
-	const controller = world.components.controller;
-	const health = world.components.health;
+export default function collisionSystem(_context?: unknown) {
+	const position = components.position;
+	const velocity = components.velocity;
+	const controlled = components.controlled;
+	const controller = components.controller;
+	const health = components.health;
 	let movingQuery = defineQuery([velocity]);
 
 	// 60fps = 0.016 so 30fps is roughly 0.032 so basically every other frame
@@ -17,7 +17,7 @@ export default function collisionSystem(world: World) {
 	let timeSinceLastTick = TIME_BETWEEN_TICKS + 1;
 	let ships: Array<number> = [];
 	let minCountToUpdate = 0;
-	return (ecs: IWorld, delta: number) => {
+	return (ecs: GameWorld, delta: number) => {
 		timeSinceLastTick += delta;
 		if(timeSinceLastTick > TIME_BETWEEN_TICKS && ships.length === 0) {
 			ships = movingQuery(ecs).filter(eid => !health.dead[eid]);
@@ -25,19 +25,22 @@ export default function collisionSystem(world: World) {
 			timeSinceLastTick = 0;
 		}
 
-		// @ts-expect-error
-		let quadtree = ecs.quadtree;
+		let spatialIndex = ecs.spatialIndex;
+		let spatialEids = ecs.spatialEids;
+		if(!spatialIndex || !spatialEids) {
+			return ecs;
+		}
 		let start = performance.now();
 
-		// Use quadtree to see who we are colliding with
+		// Use spatial index to find overlapping entities.
 		for(let i = 0; i < ships.length; i++) {
 			let eid = ships[i];
-			let entitiesInRange = quadtree.retrieve(new Rectangle({
-				x: position.x[eid],
-				y: position.y[eid],
-				width: position.width[eid],
-				height: position.height[eid]
-			})).map((result: any) => result.data.eid).filter((otherEid: number) => otherEid !== eid);
+			let entitiesInRange = spatialIndex.search(
+				position.x[eid],
+				position.y[eid],
+				position.x[eid] + position.width[eid],
+				position.y[eid] + position.height[eid]
+			).map(index => spatialEids[index]).filter((otherEid: number) => otherEid !== eid);
 			let shipColor = controller.color[controlled.owner[eid]];
 			let enemiesInRange = entitiesInRange.filter((otherEid: number) => {
 				// Ship
@@ -54,7 +57,7 @@ export default function collisionSystem(world: World) {
 			});
 			let collisions = enemiesInRange.filter((otherEid: number) => distance(position.x[otherEid], position.y[otherEid], position.x[eid], position.y[eid]) < Math.max(position.width[eid], position.width[otherEid]));
 			if(collisions.length) {
-				collide(world, ships, eid, collisions[0]);
+				collide(ecs, ships, eid, collisions[0]);
 
 				velocity.x[eid] = -velocity.x[eid];
 				velocity.y[eid] = -velocity.y[eid];
@@ -74,38 +77,38 @@ export default function collisionSystem(world: World) {
 	};
 }
 
-function collide(world: World, ships: Array<number>, eid: number, target: number) {
-	if(!canTakeDamage(world, eid) || !canTakeDamage(world, target)) {
+function collide(ecs: GameWorld, ships: Array<number>, eid: number, target: number) {
+	if(!canTakeDamage(eid) || !canTakeDamage(target)) {
 		return;
 	}
 
 	let enemyWorth = 1;
-	if(hasComponent(world.ecs, world.components.controller, target)) {
-		enemyWorth = ships.filter(eid => world.components.controlled.owner[eid] === target).length;
+	if(hasComponent(ecs, components.controller, target)) {
+		enemyWorth = ships.filter(shipEid => components.controlled.owner[shipEid] === target).length;
 	}
 
-	takeDamage(world, ships, eid, 1);
-	takeDamage(world, ships, target, 1);
+	takeDamage(ecs, ships, eid, 1);
+	takeDamage(ecs, ships, target, 1);
 
-	const controlled = world.components.controlled;
-	if(world.components.health.dead[target]) {
+	const controlled = components.controlled;
+	if(components.health.dead[target]) {
 		let stationEid = controlled.owner[eid];
-		world.components.controller.money[stationEid] += enemyWorth;
+		components.controller.money[stationEid] += enemyWorth;
 	}
-	if(world.components.health.dead[eid]) {
+	if(components.health.dead[eid]) {
 		// Ship
-		if(hasComponent(world.ecs, controlled, target)) {
+		if(hasComponent(ecs, controlled, target)) {
 			let stationEid = controlled.owner[target];
-			world.components.controller.money[stationEid] += 1;
+			components.controller.money[stationEid] += 1;
 		}
 		// Station
-		else if(hasComponent(world.ecs, world.components.controller, target)) {
-			world.components.controller.money[target] += 1;
+		else if(hasComponent(ecs, components.controller, target)) {
+			components.controller.money[target] += 1;
 		}
 	}
 }
-function takeDamage(world: World, ships: Array<number>, eid: number, damage: number) {
-	const health = world.components.health;
+function takeDamage(ecs: GameWorld, ships: Array<number>, eid: number, damage: number) {
+	const health = components.health;
 	health.shields[eid] -= damage;
 	health.timeSinceTakenDamage[eid] = 0;
 	if(health.shields[eid] < 0) {
@@ -113,8 +116,8 @@ function takeDamage(world: World, ships: Array<number>, eid: number, damage: num
 
 		// TODO: Removing makes it so our change query doesn't detect that these are gone
 		// world.removeEntity(eid);
-		if(hasComponent(world.ecs, world.components.controller, eid)) {
-			let controlledShips = ships.filter(shipEid => world.components.controlled.owner[shipEid] === eid);
+		if(hasComponent(ecs, components.controller, eid)) {
+			let controlledShips = ships.filter(shipEid => components.controlled.owner[shipEid] === eid);
 			controlledShips.forEach(shipEid => {
 				health.dead[shipEid] = 1;
 			});
@@ -122,6 +125,6 @@ function takeDamage(world: World, ships: Array<number>, eid: number, damage: num
 	}
 }
 
-function canTakeDamage(world: World, eid: number) {
-	return world.components.health.timeSinceTakenDamage[eid] >= 0.2;
+function canTakeDamage(eid: number) {
+	return components.health.timeSinceTakenDamage[eid] >= 0.2;
 }

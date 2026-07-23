@@ -1,7 +1,7 @@
 import { EventEmitter } from 'eventemitter3';
 import Entity from './entity';
 import Station from './station';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
+import Flatbush from 'flatbush';
 import euclideanDistance from '@/math/euclidean-distance';
 
 export default class World extends EventEmitter {
@@ -11,8 +11,8 @@ export default class World extends EventEmitter {
 		height: number
 	} = { width: 0, height: 0 };
 	idCounter = 0;
-	// @ts-expect-error
-	quadtree: Quadtree;
+	spatialIndex?: Flatbush;
+	spatialEntities: Array<Entity> = [];
 
 	load(config: any) {
 		config.entities.forEach((entityConfig: any) => {
@@ -48,21 +48,17 @@ export default class World extends EventEmitter {
 	}
 
 	update(delta: number) {
-		this.quadtree = new Quadtree({
-			width: this.bounds.width,
-			height: this.bounds.height
-		});
-		this.entities.forEach(entity => {
-			this.quadtree.insert(new Rectangle({
-				x: entity.x,
-				y: entity.y,
-				width: entity.width,
-				height: entity.height,
-				data: {
-					entity
-				}
-			}));
-		});
+		this.spatialEntities = this.entities.slice();
+		if(this.spatialEntities.length === 0) {
+			this.spatialIndex = undefined;
+		} else {
+			let index = new Flatbush(this.spatialEntities.length);
+			this.spatialEntities.forEach(entity => {
+				index.add(entity.x, entity.y, entity.x + entity.width, entity.y + entity.height);
+			});
+			index.finish();
+			this.spatialIndex = index;
+		}
 
 		this.entities.forEach(entity => {
 			if(entity.dead) {
@@ -97,7 +93,12 @@ export default class World extends EventEmitter {
 		return entities[0] ?? null;
 	}
 	getEntitiesInRange(range: { x: number, y: number, width: number, height: number }): Array<Entity> {
-		return this.quadtree.retrieve(new Rectangle(range)).map((result: any) => result.data.entity);
+		if(!this.spatialIndex) {
+			return [];
+		}
+
+		let indices = this.spatialIndex.search(range.x, range.y, range.x + range.width, range.y + range.height);
+		return indices.map(index => this.spatialEntities[index]);
 	}
 
 	getId() {

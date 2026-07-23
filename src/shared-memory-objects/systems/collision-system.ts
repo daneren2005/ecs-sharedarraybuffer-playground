@@ -4,7 +4,7 @@ import Ship from '../entities/ship';
 import Station from '../entities/station';
 import World from '../entities/world';
 import createWorkerSystem from './create-worker-system';
-import { Quadtree, Rectangle } from '@timohausmann/quadtree-ts';
+import Flatbush from 'flatbush';
 
 class CollisionSystem {
 	world: World;
@@ -14,32 +14,24 @@ class CollisionSystem {
 	}
 
 	run() {
-		// Create and populate quadtree
-		let quadtree = new Quadtree({
-			width: this.world.bounds.width,
-			height: this.world.bounds.height
+		let indexedEntities = this.world.entities.filter(entity => !entity.dead);
+		if(indexedEntities.length === 0) {
+			return;
+		}
+		let spatialIndex = new Flatbush(indexedEntities.length);
+		indexedEntities.forEach(entity => {
+			spatialIndex.add(entity.x, entity.y, entity.x + entity.width, entity.y + entity.height);
 		});
-
-		this.world.entities.forEach(entity => {
-			quadtree.insert(new Rectangle({
-				x: entity.x,
-				y: entity.y,
-				width: entity.width,
-				height: entity.height,
-				data: {
-					entity
-				}
-			}));
-		});
+		spatialIndex.finish();
 
 		let ships = this.world.entities.filter(entity => entity instanceof Ship) as Array<Ship>;
 		ships.forEach(ship => {
-			let entitiesInRange = quadtree.retrieve(new Rectangle({
-				x: ship.x,
-				y: ship.y,
-				width: ship.width,
-				height: ship.height
-			})).map((result: any) => result.data.entity) as Array<Entity>;
+			let entitiesInRange = spatialIndex.search(
+				ship.x,
+				ship.y,
+				ship.x + ship.width,
+				ship.y + ship.height
+			).map(index => indexedEntities[index]) as Array<Entity>;
 
 			entitiesInRange = entitiesInRange.filter(entity => {
 				if(entity instanceof Station) {
@@ -75,13 +67,13 @@ function collide(ship: Ship, target: Entity) {
 	target.takeDamage(1);
 
 	if(target.dead) {
-		ship.station.addMoney(enemyWorth);
+		ship.station!.addMoney(enemyWorth);
 	}
 	if(ship.dead) {
 		if(target instanceof Station) {
 			target.addMoney(1);
 		} else if(target instanceof Ship) {
-			target.station.addMoney(1);
+			target.station!.addMoney(1);
 		}
 	}
 }

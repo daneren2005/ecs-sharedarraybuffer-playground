@@ -47,7 +47,6 @@ onMounted(() => {
 		width,
 		height,
 		parent: 'phaser-container-simple',
-		// @ts-expect-error
 		scene: {
 			preload() {
 				this.load.image('boid', 'boid.png');
@@ -104,7 +103,7 @@ onMounted(() => {
 					};
 				});
 
-				this.input.keyboard.on('keydown-SPACE', () => {
+				this.input.keyboard!.on('keydown-SPACE', () => {
 					paused = !paused;
 				});
 			},
@@ -152,7 +151,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
 	if(game) {
-		game.destroy();
+		game.destroy(false);
 		game = null;
 	} 
 });

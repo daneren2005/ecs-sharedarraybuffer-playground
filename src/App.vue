@@ -1,6 +1,7 @@
 <template>
   <nav>
 	<router-link to="/multithreaded">Custom ECS (MT)</router-link> |
+	<router-link to="/shared-memory-ecs">Shared Memory ECS (MT)</router-link> |
 	<router-link to="/shared-memory-objects">Entity System (MT)</router-link> |
 	<router-link to="/bitecs">BitECS(ST) </router-link> |
     <router-link to="/simple">Simple Entity (ST)</router-link>
