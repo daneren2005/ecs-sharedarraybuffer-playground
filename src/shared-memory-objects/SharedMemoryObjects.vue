@@ -4,7 +4,7 @@
 			<div style="color: red">mainThread: {{ minUpdateTime.toFixed(2) }} - {{ maxUpdateTime.toFixed(2) }} ({{ avgUpdateTime.toFixed(2) }} avg) ms</div>
 			<div v-for="system in systemUpdates" :key="system.name">{{ system.name }}: {{ system.max.toFixed(2) }} ({{ system.avg.toFixed(2) }} avg) ms</div>
 			<div></div>
-			<div>Memory: {{ world.heap.prettyMemory() }} </div>
+			<div>Memory: {{ prettyMemory(world.heap) }} </div>
 			<p/>
 
 			<div>Entities: {{ stationsCount }} stations and {{ shipsCount }} ships ({{ totalCount }})</div>
@@ -22,6 +22,7 @@
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
 import generateScene from '@/data/generate-scene';
+import prettyMemory from '@/data/pretty-memory';
 import Station from './entities/station';
 import Ship from './entities/ship';
 import MainWorld from './entities/main-world';
